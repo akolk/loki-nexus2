@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+pydantic-ai
+asyncpg
+duckdb
+apscheduler
+sqlmodel
+shapely
+pyproj
+mcp
+requests
+python-multipart
+httpx
+pytest
