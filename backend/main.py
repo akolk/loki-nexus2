@@ -28,6 +28,7 @@ app = FastAPI(lifespan=lifespan)
 # Request Models
 class ChatRequest(BaseModel):
     message: str
+    bbox: Optional[Dict[str, float]] = None # north, south, east, west
 
 class JobRequest(BaseModel):
     query: str
@@ -59,15 +60,21 @@ async def chat_endpoint(
 
     deps = AgentDeps(user_soul=soul, db_session=session, user_id=user.id)
 
-    # Store user message
-    user_msg = ChatHistory(user_id=user.id, role="user", content=request.message)
+    # Enrich prompt with BBox if available
+    final_message = request.message
+    if request.bbox:
+        bbox_str = f" [Context: Map Viewport BBox: North {request.bbox.get('north')}, South {request.bbox.get('south')}, East {request.bbox.get('east')}, West {request.bbox.get('west')}]"
+        final_message += bbox_str
+
+    # Store user message (original)
+    user_msg = ChatHistory(user_id=user.id, role="user", content=request.message) # Store clean message for history
     session.add(user_msg)
     session.commit()
     session.refresh(user_msg)
 
     try:
-        # Run agent
-        response_text = await run_agent(request.message, deps)
+        # Run agent with enriched message
+        response_text = await run_agent(final_message, deps)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
