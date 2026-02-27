@@ -3,22 +3,19 @@ from dataclasses import dataclass
 from pydantic_ai import Agent, RunContext, Tool
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 from backend.models import Soul, ResearchStep, ChatHistory
-from backend.tools.data_tool import DataTool
+from backend.tools.data_tool import get_data_tool
 from backend.tools.file_tool import read_file, write_file
 from sqlmodel import Session, select
 from datetime import datetime
 import os
 
 # Tools need to be importable functions or classes
-# We redefine tool functions here to be used by the agent decorator if needed,
-# or use the class methods directly if wrapped.
-
 def run_data_query_tool(query: str) -> str:
     """
     Run a SQL query on the data (DuckDB).
     This tool transforms EPSG:28992 coordinates to WGS84 automatically.
     """
-    tool = DataTool()
+    tool = get_data_tool()
     return str(tool.execute_query(query))
 
 def read_file_tool(filepath: str) -> str:
@@ -87,15 +84,10 @@ async def run_agent(query: str, deps: AgentDeps) -> str:
     """
 
     # Load chat history
-    # Pydantic AI uses a list of messages. We need to convert our DB history to Pydantic AI messages.
-    # Note: Pydantic AI expects specific message types.
-
-    # Fetch recent history (e.g. last 10 messages) to keep context manageable
     statement = select(ChatHistory).where(ChatHistory.user_id == deps.user_id).order_by(ChatHistory.timestamp.desc()).limit(10)
     history_records = deps.db_session.exec(statement).all()
 
-    # Reverse to chronological order (oldest first)
-    # The result of all() on a slice/limit query might be a list, we reverse it.
+    # Reverse to chronological order
     history_records = list(history_records)
     history_records.reverse()
 
@@ -105,15 +97,12 @@ async def run_agent(query: str, deps: AgentDeps) -> str:
         if record.role == "user":
             message_history.append(ModelRequest(parts=[UserPromptPart(content=record.content)]))
         elif record.role == "model":
-            # For simplicity, we assume model response is text.
-            # In a full system we'd parse tool calls if we stored them.
             message_history.append(ModelResponse(parts=[TextPart(content=record.content)]))
 
     # Run the agent with history
     result = await agent.run(query, deps=deps, message_history=message_history)
 
-    # Store the result (ResearchStep)
-    # Check if result.model_name is a method or property, or if it exists
+    # Store the result
     model_name_str = "unknown"
     if hasattr(result, 'model_name'):
         if callable(result.model_name):
