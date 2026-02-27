@@ -109,14 +109,31 @@
         button:hover { background: #0056b3; }
 
         /* Job Panel (Toggleable inside chat) */
-        .job-panel {
+        .job-panel, .tools-panel {
             padding: 10px;
             background: #fafafa;
             border-bottom: 1px solid #eee;
             display: none;
         }
-        .job-panel h4 { margin: 0 0 5px 0; font-size: 0.9em; }
+        .job-panel h4, .tools-panel h4 { margin: 0 0 5px 0; font-size: 0.9em; }
+
+        /* Rendered output container */
+        .result-container {
+            width: 100%;
+            overflow-x: auto;
+            margin-top: 5px;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 5px;
+        }
+        .result-container img { max-width: 100%; height: auto; }
+        .result-container iframe { width: 100%; height: 300px; border: none; }
+        table.dataframe { border-collapse: collapse; width: 100%; font-size: 0.8em; }
+        table.dataframe th, table.dataframe td { border: 1px solid #ddd; padding: 4px; text-align: left; }
     </style>
+    <!-- Plotly JS -->
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 </head>
 <body>
 
@@ -135,8 +152,25 @@
             <div class="chat-header">
                 <strong>Workspace Agent</strong>
                 <div>
+                    <span style="font-size:0.8em; cursor:pointer; margin-right:5px; color:#007bff;" onclick="toggleToolsPanel()">Tools</span>
                     <span style="font-size:0.8em; cursor:pointer; margin-right:10px; color:#007bff;" onclick="toggleJobPanel()">Jobs</span>
                     <span style="cursor:pointer;" onclick="toggleChat()">&#x2715;</span>
+                </div>
+            </div>
+
+            <div id="tools-panel" class="tools-panel">
+                <h4>MCP Server</h4>
+                <div style="display:flex; gap:5px; margin-bottom:5px;">
+                    <select id="mcp-type" style="padding:4px; font-size:0.8em;">
+                        <option value="">Type</option>
+                        <option value="SSE">SSE (URL)</option>
+                        <option value="STDIO">STDIO (Command)</option>
+                    </select>
+                    <input type="text" id="mcp-url" placeholder="URL or Command" style="flex:2; font-size:0.8em; padding:4px;">
+                </div>
+                <h4>Skill (ZIP)</h4>
+                <div style="display:flex; gap:5px; margin-bottom:5px;">
+                    <input type="file" id="skill-file" accept=".zip" style="font-size:0.8em; width:100%;">
                 </div>
             </div>
 
