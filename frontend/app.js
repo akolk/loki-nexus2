@@ -62,6 +62,11 @@ function toggleChat() {
     }
 }
 
+function toggleToolsPanel() {
+    const panel = document.getElementById("tools-panel");
+    panel.style.display = panel.style.display === "block" ? "none" : "block";
+}
+
 function toggleJobPanel() {
     const panel = document.getElementById("job-panel");
     panel.style.display = panel.style.display === "block" ? "none" : "block";
@@ -84,10 +89,57 @@ async function loadHistory() {
     }
 }
 
-function appendMessage(role, content) {
+function appendMessage(role, content, execResult=null) {
     const msgDiv = document.createElement("div");
     msgDiv.className = `message ${role}`;
-    msgDiv.innerHTML = `<strong>${role}:</strong> ${content}`;
+
+    // Convert newlines to breaks for text content
+    let formattedContent = content;
+    if (typeof content === 'string') {
+        formattedContent = content.replace(/\n/g, '<br>');
+    }
+
+    msgDiv.innerHTML = `<strong>${role}:</strong> <br>${formattedContent}`;
+
+    if (execResult) {
+        const resDiv = document.createElement("div");
+        resDiv.className = "result-container";
+
+        if (execResult.type === "dataframe") {
+            // Assume content is HTML table string
+            resDiv.innerHTML = execResult.content;
+        } else if (execResult.type === "picture") {
+            // Assume content is base64 string or URL
+            const img = document.createElement("img");
+            img.src = execResult.content.startsWith('http') ? execResult.content : `data:image/png;base64,${execResult.content}`;
+            resDiv.appendChild(img);
+        } else if (execResult.type === "html") {
+            resDiv.innerHTML = execResult.content;
+        } else if (execResult.type === "plotly") {
+            // Assume content is JSON string for plotly layout/data
+            try {
+                const plotData = typeof execResult.content === 'string' ? JSON.parse(execResult.content) : execResult.content;
+                const plotDivId = 'plotly-' + Math.random().toString(36).substr(2, 9);
+                resDiv.id = plotDivId;
+                setTimeout(() => {
+                    Plotly.newPlot(plotDivId, plotData.data, plotData.layout);
+                }, 100);
+            } catch (e) {
+                resDiv.innerHTML = "Error rendering Plotly chart: " + e;
+            }
+        } else if (execResult.type === "folium") {
+            // Assume content is HTML for an iframe
+            const iframe = document.createElement("iframe");
+            iframe.srcdoc = execResult.content;
+            resDiv.appendChild(iframe);
+        } else {
+            // Fallback
+            resDiv.innerHTML = `<pre>${JSON.stringify(execResult.content, null, 2)}</pre>`;
+        }
+
+        msgDiv.appendChild(resDiv);
+    }
+
     historyDiv.appendChild(msgDiv);
     scrollToBottom();
 }
@@ -117,18 +169,37 @@ async function sendMessage() {
         console.log("Sending BBox:", bbox);
     }
 
+    const mcpType = document.getElementById("mcp-type").value;
+    const mcpUrl = document.getElementById("mcp-url").value;
+    const skillFile = document.getElementById("skill-file").files[0];
+
+    const formData = new FormData();
+    formData.append("message", message);
+    if (bbox) formData.append("bbox", JSON.stringify(bbox));
+    if (mcpType && mcpUrl) {
+        formData.append("mcp_type", mcpType);
+        formData.append("mcp_url", mcpUrl);
+    }
+    if (skillFile) {
+        formData.append("skill_file", skillFile);
+    }
+
     try {
         const response = await fetch("/chat", {
             method: "POST",
             headers: {
-                "Content-Type": "application/json",
                 "x-forwarded-user": username
             },
-            body: JSON.stringify({ message, bbox }) // Send bbox
+            body: formData // Send FormData
         });
 
         const data = await response.json();
-        appendMessage("model", data.response);
+        if (data.exec_result) {
+            appendMessage("model", data.response, data.exec_result);
+        } else {
+            appendMessage("model", data.response);
+        }
+
     } catch (e) {
         appendMessage("model", "Error communicating with agent.");
         console.error(e);

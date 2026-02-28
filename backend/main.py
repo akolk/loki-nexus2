@@ -1,10 +1,11 @@
-from fastapi import FastAPI, Depends, Header, HTTPException, Request
+from fastapi import FastAPI, Depends, Header, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlmodel import Session, select
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
+import json
 
 from backend.database import engine, init_db
 from backend.models import User, Soul, ChatHistory, ResearchStep
@@ -26,20 +27,28 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # Request Models
-class ChatRequest(BaseModel):
-    message: str
-    bbox: Optional[Dict[str, float]] = None # north, south, east, west
-
 class JobRequest(BaseModel):
     query: str
     interval_seconds: int = 3600
 
 @app.post("/chat")
 async def chat_endpoint(
-    request: ChatRequest,
+    message: str = Form(...),
+    bbox: Optional[str] = Form(None),
+    mcp_url: Optional[str] = Form(None),
+    mcp_type: Optional[str] = Form(None),
+    skill_file: Optional[UploadFile] = File(None),
     x_forwarded_user: str = Header("unknown_user", alias="x-forwarded-user"),
     session: Session = Depends(get_session)
 ):
+    # Parse bbox if provided
+    bbox_dict = None
+    if bbox:
+        try:
+            bbox_dict = json.loads(bbox)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid bbox format")
+
     # Ensure user exists
     statement = select(User).where(User.username == x_forwarded_user)
     results = session.exec(statement)
@@ -58,32 +67,42 @@ async def chat_endpoint(
         style=user.soul_data.get("style", "concise")
     )
 
-    deps = AgentDeps(user_soul=soul, db_session=session, user_id=user.id)
+    deps = AgentDeps(
+        user_soul=soul,
+        db_session=session,
+        user_id=user.id,
+        mcp_url=mcp_url,
+        mcp_type=mcp_type,
+        skill_file=skill_file
+    )
 
     # Enrich prompt with BBox if available
-    final_message = request.message
-    if request.bbox:
-        bbox_str = f" [Context: Map Viewport BBox: North {request.bbox.get('north')}, South {request.bbox.get('south')}, East {request.bbox.get('east')}, West {request.bbox.get('west')}]"
+    final_message = message
+    if bbox_dict:
+        bbox_str = f" [Context: Map Viewport BBox: North {bbox_dict.get('north')}, South {bbox_dict.get('south')}, East {bbox_dict.get('east')}, West {bbox_dict.get('west')}]"
         final_message += bbox_str
 
     # Store user message (original)
-    user_msg = ChatHistory(user_id=user.id, role="user", content=request.message) # Store clean message for history
+    user_msg = ChatHistory(user_id=user.id, role="user", content=message) # Store clean message for history
     session.add(user_msg)
     session.commit()
     session.refresh(user_msg)
 
     try:
         # Run agent with enriched message
-        response_text = await run_agent(final_message, deps)
+        agent_out = await run_agent(final_message, deps)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    response_text = agent_out["response"]
+    exec_result = agent_out["exec_result"]
 
     # Store model response
     model_msg = ChatHistory(user_id=user.id, role="model", content=response_text)
     session.add(model_msg)
     session.commit()
 
-    return {"response": response_text}
+    return {"response": response_text, "exec_result": exec_result}
 
 @app.get("/history")
 def get_history(

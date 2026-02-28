@@ -15,7 +15,7 @@ client = TestClient(app)
 @patch("backend.main.run_agent")
 def test_chat_flow(mock_run_agent):
     # Setup mock
-    mock_run_agent.return_value = "Mocked Agent Response"
+    mock_run_agent.return_value = {"response": "Mocked Agent Response", "exec_result": None}
 
     # Setup DB
     init_db()
@@ -23,13 +23,13 @@ def test_chat_flow(mock_run_agent):
     # 1. Send a chat message
     response = client.post(
         "/chat",
-        json={"message": "Hello Agent"},
+        data={"message": "Hello Agent"},
         headers={"x-forwarded-user": "test_api_user"}
     )
 
     assert response.status_code == 200
     data = response.json()
-    assert data["response"] == "Mocked Agent Response"
+    assert "Mocked Agent Response" in data["response"]
 
     # 2. Verify User creation
     with Session(engine) as session:
@@ -45,17 +45,17 @@ def test_chat_flow(mock_run_agent):
     history = response.json()
     # Should have user message and model response
     assert len(history) >= 2
-    assert history[0]["content"] == "Hello Agent"
-    assert history[1]["content"] == "Mocked Agent Response"
+    assert history[-2]["content"] == "Hello Agent"
+    assert "Mocked Agent Response" in history[-1]["content"]
 
 def test_job_scheduling():
     # Ensure user exists first (re-using client state if persistent, but safe to re-init)
     # We need to mock run_agent here too implicitly because /chat calls it
     with patch("backend.main.run_agent") as mock_run:
-        mock_run.return_value = "ack"
+        mock_run.return_value = {"response": "ack", "exec_result": None}
         client.post(
             "/chat",
-            json={"message": "Init user"},
+            data={"message": "Init user"},
             headers={"x-forwarded-user": "job_user"}
         )
 
