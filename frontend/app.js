@@ -45,6 +45,27 @@ function toggleMode() {
     }
 }
 
+let isSettingsOpen = false;
+function toggleSettings() {
+    isSettingsOpen = !isSettingsOpen;
+    const sidebar = document.getElementById("settings-sidebar");
+    if (isSettingsOpen) {
+        sidebar.style.display = "flex";
+    } else {
+        sidebar.style.display = "none";
+    }
+}
+
+function openSettings() {
+    isSettingsOpen = true;
+    document.getElementById("settings-sidebar").style.display = "flex";
+}
+
+function closeSettings() {
+    isSettingsOpen = false;
+    document.getElementById("settings-sidebar").style.display = "none";
+}
+
 let isChatOpen = false;
 function toggleChat() {
     isChatOpen = !isChatOpen;
@@ -60,21 +81,6 @@ function toggleChat() {
         chatWindow.style.display = "none";
         chatBubble.style.display = "flex";
     }
-}
-
-function toggleToolsPanel() {
-    const panel = document.getElementById("tools-panel");
-    panel.style.display = panel.style.display === "block" ? "none" : "block";
-}
-
-function toggleJobPanel() {
-    const panel = document.getElementById("job-panel");
-    panel.style.display = panel.style.display === "block" ? "none" : "block";
-}
-
-function toggleResearchPanel() {
-    const panel = document.getElementById("research-panel");
-    panel.style.display = panel.style.display === "block" ? "none" : "block";
 }
 
 async function loadHistory() {
