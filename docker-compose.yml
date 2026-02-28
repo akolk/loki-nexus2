@@ -40,6 +40,23 @@ services:
     networks:
       - app-network
 
+  # Auth Proxy Service (Simulates external Identity Provider)
+  auth-proxy:
+    image: nginx:alpine
+    container_name: loki_nexus_auth_proxy
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+      - "8082:8082"
+      - "8083:8083"
+      - "8084:8084"
+    volumes:
+      - ./auth-proxy.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+    networks:
+      - app-network
+
   # Database Service (Postgres + PostGIS + PgVector)
   db:
     image: ghcr.io/akolk/loki-nexus-db:latest
