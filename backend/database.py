@@ -4,10 +4,19 @@ import os
 import time
 from sqlalchemy.exc import OperationalError
 
-# Handle asyncpg vs psycopg2 vs sqlite
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./backend/data.db")
+# Handle postgres via standard env variables or fallback to sqlite
+PG_USER = os.environ.get("POSTGRES_USER")
+PG_PASSWORD = os.environ.get("POSTGRES_PASSWORD")
+PG_HOST = os.environ.get("POSTGRES_HOST")
+PG_PORT = os.environ.get("POSTGRES_PORT", "5432")
+PG_DB = os.environ.get("POSTGRES_DB")
 
-# If using sync session/engine (which we are for now mostly), we need sync driver.
+# Construct DATABASE_URL if all Postgres variables are provided
+if all([PG_USER, PG_PASSWORD, PG_HOST, PG_DB]):
+    DATABASE_URL = f"postgresql://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB}"
+else:
+    DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./backend/data.db")
+
 # If env var is `postgresql+asyncpg`, strip `+asyncpg`.
 if "postgresql+asyncpg" in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("+asyncpg", "")

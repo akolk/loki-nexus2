@@ -1,16 +1,21 @@
 services:
   # Backend Service
   backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    container_name: pydantic_ai_backend
+    image: ghcr.io/akolk/loki-nexus-backend:latest
+    container_name: loki_nexus_backend
     restart: unless-stopped
     env_file: .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/pydantic_ai_workspace
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-pydantic_ai_workspace}
+      - POSTGRES_HOST=${POSTGRES_HOST:-db}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - LOG_LEVEL=info
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME}
+      - OPENAI_API_VERSION=${OPENAI_API_VERSION:-2023-05-15}
     volumes:
       - ./backend:/app/backend
       - ./backend/workspace:/app/backend/workspace
@@ -22,8 +27,8 @@ services:
 
   # Frontend Service (Nginx + Reverse Proxy)
   frontend:
-    image: nginx:alpine
-    container_name: pydantic_ai_frontend
+    image: ghcr.io/akolk/loki-nexus-frontend:latest
+    container_name: loki_nexus_frontend
     restart: unless-stopped
     ports:
       - "80:80"
@@ -37,10 +42,8 @@ services:
 
   # Database Service (Postgres + PostGIS + PgVector)
   db:
-    build:
-      context: ./database
-      dockerfile: Dockerfile
-    container_name: pydantic_ai_db
+    image: ghcr.io/akolk/loki-nexus-db:latest
+    container_name: loki_nexus_db
     restart: unless-stopped
     environment:
       - POSTGRES_USER=postgres

@@ -57,7 +57,9 @@ class AgentResponse(BaseModel):
     followup: List[str]
 
 # Use a test model if API key is not present (for CI/build environment)
-model_name = 'openai:gpt-4o' if os.environ.get("OPENAI_API_KEY") else 'test'
+# Pydantic AI uses `azure:<deployment-name>` for Azure OpenAI
+deployment_name = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.1")
+model_name = f'azure:{deployment_name}' if os.environ.get("AZURE_OPENAI_API_KEY") else 'test'
 
 # Define the agent
 agent = Agent(
