@@ -22,8 +22,9 @@ from mcp.shared.exceptions import McpError
 from pydantic_ai_skills import SkillsToolset, SkillsDirectory
 import logging
 
-# This captures the internal movements of PydanticAI
-logging.getLogger('pydantic_ai').setLevel(logging.DEBUG)
+# Setup standard logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("api")
 # Tools need to be importable functions or classes
 # We redefine tool functions here to be used by the agent decorator if needed,
 # or use the class methods directly if wrapped.
@@ -174,9 +175,9 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
                 result = await agent.run(query, deps=deps, message_history=message_history, toolsets=run_toolsets)
                 return result.data
     else:
-        print(query)
+        logger.info(query)
         result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets)
-        print(result)
+        logger.info(result)
         return result.data
 
 async def run_agent(query: str, deps: AgentDeps) -> dict:
@@ -188,7 +189,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     toolsets = []
     tmp_dir = None
 
-    print(deps)
+    logger.info(deps)
 
     # Load skill file if provided
     if deps.skill_file:
@@ -253,7 +254,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     except Exception as e:
         exec_result = {"type": "error", "content": f"Execution error: {str(e)}"}
 
-    print(exec_result)
+    logger.info(exec_result)
     # Determine model string for metadata
     model_name_str = str(model_name)
 
