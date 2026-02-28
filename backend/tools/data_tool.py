@@ -8,16 +8,29 @@ class DataTool:
     Enforces lazy loading/limiting and predicate pushdown.
     """
 
-    def __init__(self, db_path: str = ":memory:"):
+    def __init__(self, db_path: str = ":memory:", username: Optional[str] = None):
         self.con = duckdb.connect(db_path)
+        self.username = username
         # Install spatial extension if possible (might not work in all envs without internet/pre-install)
         # We skip this for now as it's complex to setup in sandboxed envs.
         # We rely on pure python projection via pyproj.
+
+    def __del__(self):
+        try:
+            self.con.close()
+        except Exception:
+            pass
 
     def execute_query(self, sql_query: str, limit: int = 100) -> List[Dict[str, Any]]:
         """
         Executes a SQL query and returns a list of dictionaries.
         """
+        if self.username:
+            parquet_dir = f"/data/{self.username}/"
+            # Ensure the directory exists to avoid errors, even if it might be empty
+            os.makedirs(parquet_dir, exist_ok=True)
+            sql_query = sql_query.replace("__PARQUET_DIR__", parquet_dir)
+
         if "limit" not in sql_query.lower():
             sql_query += f" LIMIT {limit}"
 
@@ -62,14 +75,14 @@ class DataTool:
         return new_data
 
 # Standalone function for the agent to call
-def run_data_query(query: str) -> str:
+def run_data_query(query: str, username: Optional[str] = None) -> str:
     """
     Runs a DuckDB SQL query.
     Use this tool to analyze large datasets.
     The tool automatically limits results to 100 rows to prevent memory issues.
     If you need aggregations, perform them in the SQL query (predicate pushdown).
     """
-    tool = DataTool()
+    tool = DataTool(username=username)
     # Create a dummy table for testing if not exists
     tool.con.execute("CREATE TABLE IF NOT EXISTS test_data (id INTEGER, x INTEGER, y INTEGER, value VARCHAR)")
     # Insert Amersfoort coordinates (RD New center)

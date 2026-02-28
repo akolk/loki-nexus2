@@ -5,3 +5,5 @@ __pycache__/
 .DS_Store
 backend/data.db
 backend/workspace/
+__pycache__/
+*.db

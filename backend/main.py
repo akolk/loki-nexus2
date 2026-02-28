@@ -10,6 +10,7 @@ import json
 from backend.database import engine, init_db
 from backend.models import User, Soul, ChatHistory, ResearchStep
 from backend.agent import run_agent, AgentDeps
+from backend.research_agent import run_research_agent
 from backend.scheduler import start_scheduler, add_job, scheduler
 
 # Helper to get session
@@ -30,6 +31,47 @@ app = FastAPI(lifespan=lifespan)
 class JobRequest(BaseModel):
     query: str
     interval_seconds: int = 3600
+
+class ResearchRequest(BaseModel):
+    query: str
+    format: str
+
+@app.post("/deep_research")
+async def deep_research_endpoint(
+    request: ResearchRequest,
+    x_forwarded_user: str = Header("unknown_user", alias="x-forwarded-user"),
+    session: Session = Depends(get_session)
+):
+    # Ensure user exists
+    statement = select(User).where(User.username == x_forwarded_user)
+    results = session.exec(statement)
+    user = results.first()
+
+    if not user:
+        user = User(username=x_forwarded_user, soul_data={"style": "concise", "preferences": {}})
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+    soul = Soul(
+        user_id=str(user.id),
+        username=user.username,
+        preferences=user.soul_data.get("preferences", {}),
+        style=user.soul_data.get("style", "concise")
+    )
+
+    deps = AgentDeps(
+        user_soul=soul,
+        db_session=session,
+        user_id=user.id
+    )
+
+    try:
+        agent_out = await run_research_agent(request.query, request.format, deps)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return agent_out
 
 @app.post("/chat")
 async def chat_endpoint(
