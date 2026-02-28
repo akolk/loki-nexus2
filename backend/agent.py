@@ -60,7 +60,7 @@ class AgentResponse(BaseModel):
 # Pydantic AI uses `azure:<deployment-name>` for Azure OpenAI
 # First check openai, then azure openai
 if os.environ.get("OPENAI_API_KEY"):
-    model_name_env = os.environ.get("OPENAI_MODEL_NAME", "gpt-4o")
+    model_name_env = os.environ.get("OPENAI_MODEL_NAME", "gpt-5.1")
     model_name = f'openai:{model_name_env}'
 elif os.environ.get("AZURE_OPENAI_API_KEY"):
     deployment_name = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.1")
@@ -227,6 +227,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     # Run the agent with history and toolsets
     try:
         agent_response = await _connect_mcp_and_run(query, deps, message_history, toolsets)
+        print(agent_response)
     except Exception as e:
         if tmp_dir:
             shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -245,6 +246,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     except Exception as e:
         exec_result = {"type": "error", "content": f"Execution error: {str(e)}"}
 
+    print(exec_result)
     # Determine model string for metadata
     model_name_str = str(model_name)
 
