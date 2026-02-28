@@ -1,7 +1,7 @@
 services:
   # Backend Service
   backend:
-    image: ghcr.io/akolk/loki-nexus-backend:latest
+    image: ghcr.io/akolk/loki-nexus-backend:${VERSION:-main}
     container_name: loki_nexus_backend
     restart: unless-stopped
     env_file: .env
@@ -27,7 +27,7 @@ services:
 
   # Frontend Service (Nginx + Reverse Proxy)
   frontend:
-    image: ghcr.io/akolk/loki-nexus-frontend:latest
+    image: ghcr.io/akolk/loki-nexus-frontend:${VERSION:-main}
     container_name: loki_nexus_frontend
     restart: unless-stopped
     ports:
@@ -59,7 +59,7 @@ services:
 
   # Database Service (Postgres + PostGIS + PgVector)
   db:
-    image: ghcr.io/akolk/loki-nexus-db:latest
+    image: ghcr.io/akolk/loki-nexus-db:${VERSION:-main}
     container_name: loki_nexus_db
     restart: unless-stopped
     environment:
