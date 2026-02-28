@@ -20,7 +20,10 @@ from mcp.client.sse import sse_client
 from mcp.client.session import ClientSession
 from mcp.shared.exceptions import McpError
 from pydantic_ai_skills import SkillsToolset, SkillsDirectory
+import logging
 
+# This captures the internal movements of PydanticAI
+logging.getLogger('pydantic_ai').setLevel(logging.DEBUG)
 # Tools need to be importable functions or classes
 # We redefine tool functions here to be used by the agent decorator if needed,
 # or use the class methods directly if wrapped.
