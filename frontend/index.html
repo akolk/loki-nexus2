@@ -19,19 +19,64 @@
             display: none;
         }
 
-        /* Mode Switcher (Top Right) */
-        #mode-switcher {
+        /* Settings Panel Sidebar */
+        #settings-sidebar {
             position: absolute;
-            top: 20px; right: 20px;
-            z-index: 1000;
+            top: 0; left: 0; width: 20%; height: 100%;
+            background: white;
+            z-index: 1001; /* Above map and other elements */
+            box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            overflow-y: auto;
+            border-right: 1px solid #ccc;
+        }
+
+        /* Settings Toggle Button (Hamburger) */
+        #settings-toggle {
+            position: absolute;
+            top: 20px; left: 20px;
+            z-index: 1002;
             background: white;
             padding: 10px 15px;
             border-radius: 5px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             cursor: pointer;
             font-weight: bold;
+            font-size: 20px;
             user-select: none;
             border: 1px solid #ccc;
+        }
+
+        .settings-header {
+            padding: 15px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .settings-section {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .settings-section h4 {
+            margin: 0 0 10px 0;
+            font-size: 1em;
+            color: #333;
+        }
+
+        /* Mode Switcher (Moved to settings) */
+        #mode-switcher {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            user-select: none;
+            border: 1px solid #ccc;
+            text-align: center;
         }
 
         /* Chat Widget Container (Bottom Left) */
@@ -108,14 +153,10 @@
         button { padding: 8px 15px; background: #007bff; color: white; border: none; border-radius: 20px; cursor: pointer; }
         button:hover { background: #0056b3; }
 
-        /* Job Panel (Toggleable inside chat) */
+        /* Job Panel (Moved to settings) */
         .job-panel, .tools-panel, .research-panel {
-            padding: 10px;
-            background: #fafafa;
-            border-bottom: 1px solid #eee;
-            display: none;
+            /* Now part of settings-section, so remove the old specific hiding */
         }
-        .job-panel h4, .tools-panel h4, .research-panel h4 { margin: 0 0 5px 0; font-size: 0.9em; }
 
         /* Rendered output container */
         .result-container {
@@ -140,9 +181,59 @@
     <!-- Map Container -->
     <div id="map-container"></div>
 
-    <!-- Mode Switcher -->
-    <div id="mode-switcher" onclick="toggleMode()">
-        Map Mode: <span id="mode-label" style="color: black;">OFF</span>
+    <!-- Settings Toggle Button -->
+    <div id="settings-toggle" onclick="toggleSettings()" onmouseover="openSettings()">
+        &#9776;
+    </div>
+
+    <!-- Settings Sidebar Panel -->
+    <div id="settings-sidebar" onmouseleave="closeSettings()">
+        <div class="settings-header">Settings</div>
+
+        <div class="settings-section">
+            <div id="mode-switcher" onclick="toggleMode()">
+                Map Mode: <span id="mode-label" style="color: black;">OFF</span>
+            </div>
+        </div>
+
+        <div class="settings-section tools-panel">
+            <h4>Tools</h4>
+            <div style="font-size:0.9em; font-weight:bold; margin-bottom:5px;">MCP Server</div>
+            <div style="display:flex; gap:5px; margin-bottom:10px;">
+                <select id="mcp-type" style="padding:4px; font-size:0.8em; width:30%;">
+                    <option value="">Type</option>
+                    <option value="SSE">SSE</option>
+                    <option value="STDIO">STDIO</option>
+                </select>
+                <input type="text" id="mcp-url" placeholder="URL or Command" style="flex:1; font-size:0.8em; padding:4px;">
+            </div>
+            <div style="font-size:0.9em; font-weight:bold; margin-bottom:5px;">Skill (ZIP)</div>
+            <div style="display:flex; gap:5px;">
+                <input type="file" id="skill-file" accept=".zip" style="font-size:0.8em; width:100%;">
+            </div>
+        </div>
+
+        <div class="settings-section job-panel">
+            <h4>Jobs</h4>
+            <div style="font-size:0.9em; font-weight:bold; margin-bottom:5px;">Schedule Job</div>
+            <div style="display:flex; gap:5px; margin-bottom:5px;">
+                <input type="text" id="job-query" placeholder="Query" style="flex:2; font-size:0.8em; padding:4px;">
+                <input type="number" id="job-interval" placeholder="Sec" value="3600" style="flex:1; font-size:0.8em; padding:4px;">
+            </div>
+            <button onclick="scheduleJob()" style="padding: 4px 10px; font-size: 0.8em; width:100%;">Add Job</button>
+            <div id="status" style="font-size: 0.8em; color: #666; margin-top: 5px; text-align:center;"></div>
+        </div>
+
+        <div class="settings-section research-panel">
+            <h4>Research</h4>
+            <div style="font-size:0.9em; font-weight:bold; margin-bottom:5px;">Deep Research</div>
+            <div style="display:flex; flex-direction: column; gap:5px; margin-bottom:5px;">
+                <input type="text" id="research-query" placeholder="Research Topic" style="font-size:0.8em; padding:4px; box-sizing: border-box; width:100%;">
+                <input type="text" id="research-format" placeholder="Format" value="Markdown" style="font-size:0.8em; padding:4px; box-sizing: border-box; width:100%;">
+            </div>
+            <button onclick="startDeepResearch()" style="padding: 4px 10px; font-size: 0.8em; width:100%;">Start Research</button>
+            <div id="research-status" style="font-size: 0.8em; color: #666; margin-top: 5px; text-align:center;"></div>
+        </div>
     </div>
 
     <!-- Chat Widget -->
@@ -152,47 +243,8 @@
             <div class="chat-header">
                 <strong>Workspace Agent</strong>
                 <div>
-                    <span style="font-size:0.8em; cursor:pointer; margin-right:5px; color:#007bff;" onclick="toggleResearchPanel()">Research</span>
-                    <span style="font-size:0.8em; cursor:pointer; margin-right:5px; color:#007bff;" onclick="toggleToolsPanel()">Tools</span>
-                    <span style="font-size:0.8em; cursor:pointer; margin-right:10px; color:#007bff;" onclick="toggleJobPanel()">Jobs</span>
                     <span style="cursor:pointer;" onclick="toggleChat()">&#x2715;</span>
                 </div>
-            </div>
-
-            <div id="tools-panel" class="tools-panel">
-                <h4>MCP Server</h4>
-                <div style="display:flex; gap:5px; margin-bottom:5px;">
-                    <select id="mcp-type" style="padding:4px; font-size:0.8em;">
-                        <option value="">Type</option>
-                        <option value="SSE">SSE (URL)</option>
-                        <option value="STDIO">STDIO (Command)</option>
-                    </select>
-                    <input type="text" id="mcp-url" placeholder="URL or Command" style="flex:2; font-size:0.8em; padding:4px;">
-                </div>
-                <h4>Skill (ZIP)</h4>
-                <div style="display:flex; gap:5px; margin-bottom:5px;">
-                    <input type="file" id="skill-file" accept=".zip" style="font-size:0.8em; width:100%;">
-                </div>
-            </div>
-
-            <div id="job-panel" class="job-panel">
-                <h4>Schedule Job</h4>
-                <div style="display:flex; gap:5px; margin-bottom:5px;">
-                    <input type="text" id="job-query" placeholder="Query (e.g. daily update)" style="flex:2;">
-                    <input type="number" id="job-interval" placeholder="Sec" value="3600" style="flex:1;">
-                </div>
-                <button onclick="scheduleJob()" style="padding: 4px 10px; font-size: 0.8em; width:100%;">Add Job</button>
-                <div id="status" style="font-size: 0.8em; color: #666; margin-top: 5px; text-align:center;"></div>
-            </div>
-
-            <div id="research-panel" class="research-panel">
-                <h4>Deep Research</h4>
-                <div style="display:flex; gap:5px; margin-bottom:5px;">
-                    <input type="text" id="research-query" placeholder="Research Topic" style="flex:2; min-width: 0; box-sizing: border-box;">
-                    <input type="text" id="research-format" placeholder="Format" value="Markdown" style="flex:1; min-width: 0; box-sizing: border-box;">
-                </div>
-                <button onclick="startDeepResearch()" style="padding: 4px 10px; font-size: 0.8em; width:100%;">Start Research</button>
-                <div id="research-status" style="font-size: 0.8em; color: #666; margin-top: 5px; text-align:center;"></div>
             </div>
 
             <div class="chat-body" id="chat-history">
