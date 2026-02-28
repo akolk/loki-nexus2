@@ -109,13 +109,13 @@
         button:hover { background: #0056b3; }
 
         /* Job Panel (Toggleable inside chat) */
-        .job-panel, .tools-panel {
+        .job-panel, .tools-panel, .research-panel {
             padding: 10px;
             background: #fafafa;
             border-bottom: 1px solid #eee;
             display: none;
         }
-        .job-panel h4, .tools-panel h4 { margin: 0 0 5px 0; font-size: 0.9em; }
+        .job-panel h4, .tools-panel h4, .research-panel h4 { margin: 0 0 5px 0; font-size: 0.9em; }
 
         /* Rendered output container */
         .result-container {
@@ -152,6 +152,7 @@
             <div class="chat-header">
                 <strong>Workspace Agent</strong>
                 <div>
+                    <span style="font-size:0.8em; cursor:pointer; margin-right:5px; color:#007bff;" onclick="toggleResearchPanel()">Research</span>
                     <span style="font-size:0.8em; cursor:pointer; margin-right:5px; color:#007bff;" onclick="toggleToolsPanel()">Tools</span>
                     <span style="font-size:0.8em; cursor:pointer; margin-right:10px; color:#007bff;" onclick="toggleJobPanel()">Jobs</span>
                     <span style="cursor:pointer;" onclick="toggleChat()">&#x2715;</span>
@@ -182,6 +183,16 @@
                 </div>
                 <button onclick="scheduleJob()" style="padding: 4px 10px; font-size: 0.8em; width:100%;">Add Job</button>
                 <div id="status" style="font-size: 0.8em; color: #666; margin-top: 5px; text-align:center;"></div>
+            </div>
+
+            <div id="research-panel" class="research-panel">
+                <h4>Deep Research</h4>
+                <div style="display:flex; gap:5px; margin-bottom:5px;">
+                    <input type="text" id="research-query" placeholder="Research Topic" style="flex:2; min-width: 0; box-sizing: border-box;">
+                    <input type="text" id="research-format" placeholder="Format" value="Markdown" style="flex:1; min-width: 0; box-sizing: border-box;">
+                </div>
+                <button onclick="startDeepResearch()" style="padding: 4px 10px; font-size: 0.8em; width:100%;">Start Research</button>
+                <div id="research-status" style="font-size: 0.8em; color: #666; margin-top: 5px; text-align:center;"></div>
             </div>
 
             <div class="chat-body" id="chat-history">

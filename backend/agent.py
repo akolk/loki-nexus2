@@ -25,12 +25,12 @@ from pydantic_ai_skills import SkillsToolset, SkillsDirectory
 # We redefine tool functions here to be used by the agent decorator if needed,
 # or use the class methods directly if wrapped.
 
-def run_data_query_tool(query: str) -> str:
+def run_data_query_tool(query: str, username: Optional[str] = None) -> str:
     """
     Run a SQL query on the data (DuckDB).
     This tool transforms EPSG:28992 coordinates to WGS84 automatically.
     """
-    tool = DataTool()
+    tool = DataTool(username=username)
     return str(tool.execute_query(query))
 
 def read_file_tool(filepath: str) -> str:
@@ -87,8 +87,9 @@ agent = Agent(
 def data_query(ctx: RunContext[AgentDeps], query: str) -> str:
     """
     Run a SQL query on the data using DuckDB.
+    Use __PARQUET_DIR__ as a path to access the user's parquet files (e.g. read_parquet('__PARQUET_DIR__*.parquet')).
     """
-    return run_data_query_tool(query)
+    return run_data_query_tool(query, username=ctx.deps.user_soul.username)
 
 @agent.tool
 def read_file_content(ctx: RunContext[AgentDeps], filepath: str) -> str:
@@ -201,7 +202,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
 
     # Reverse to chronological order (oldest first)
     # The result of all() on a slice/limit query might be a list, we reverse it.
-    history_records = list(history_records)
+    history_records: List[ChatHistory] = list(history_records)
     history_records.reverse()
 
     message_history: List[ModelMessage] = []

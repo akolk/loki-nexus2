@@ -72,6 +72,11 @@ function toggleJobPanel() {
     panel.style.display = panel.style.display === "block" ? "none" : "block";
 }
 
+function toggleResearchPanel() {
+    const panel = document.getElementById("research-panel");
+    panel.style.display = panel.style.display === "block" ? "none" : "block";
+}
+
 async function loadHistory() {
     try {
         const response = await fetch("/history", {
@@ -231,6 +236,39 @@ async function scheduleJob() {
         if (statusDiv) statusDiv.textContent = `Job Scheduled: ${data.status}`;
     } catch (e) {
         if (statusDiv) statusDiv.textContent = "Error scheduling job.";
+    }
+}
+
+async function startDeepResearch() {
+    const query = document.getElementById("research-query").value;
+    const format = document.getElementById("research-format").value;
+    const researchStatusDiv = document.getElementById("research-status");
+
+    if (!query || !format) return;
+
+    if (researchStatusDiv) researchStatusDiv.textContent = "Running research...";
+
+    try {
+        const response = await fetch("/deep_research", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-forwarded-user": username
+            },
+            body: JSON.stringify({ query, format })
+        });
+
+        const data = await response.json();
+
+        if (researchStatusDiv) researchStatusDiv.textContent = "Research completed!";
+
+        if (data.exec_result) {
+            appendMessage("model", data.response, data.exec_result);
+        } else {
+            appendMessage("model", data.response);
+        }
+    } catch (e) {
+        if (researchStatusDiv) researchStatusDiv.textContent = "Error running research.";
     }
 }
 
