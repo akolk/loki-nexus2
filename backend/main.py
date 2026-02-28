@@ -117,6 +117,7 @@ async def chat_endpoint(
         mcp_type=mcp_type,
         skill_file=skill_file
     )
+    print(deps)
 
     # Enrich prompt with BBox if available
     final_message = message
@@ -132,6 +133,7 @@ async def chat_endpoint(
 
     try:
         # Run agent with enriched message
+        print(final_message)
         agent_out = await run_agent(final_message, deps)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
