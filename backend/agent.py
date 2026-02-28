@@ -185,6 +185,8 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     toolsets = []
     tmp_dir = None
 
+    print(deps)
+
     # Load skill file if provided
     if deps.skill_file:
         tmp_dir = tempfile.mkdtemp()
