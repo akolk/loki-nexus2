@@ -171,7 +171,9 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
                 result = await agent.run(query, deps=deps, message_history=message_history, toolsets=run_toolsets)
                 return result.data
     else:
+        print(query)
         result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets)
+        print(result)
         return result.data
 
 async def run_agent(query: str, deps: AgentDeps) -> dict:
