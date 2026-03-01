@@ -236,6 +236,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
         agent_response = await _connect_mcp_and_run(query, deps, message_history, toolsets)
         print(agent_response)
     except Exception as e:
+        logger.error(f"Error executing agent in run_agent: {e}", exc_info=True)
         if tmp_dir:
             shutil.rmtree(tmp_dir, ignore_errors=True)
         raise e
@@ -251,6 +252,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
         if not exec_result:
             exec_result = {"type": "error", "content": "Agent code executed but did not set the 'result' variable."}
     except Exception as e:
+        logger.error(f"Execution error of generated agent code: {e}", exc_info=True)
         exec_result = {"type": "error", "content": f"Execution error: {str(e)}"}
 
     logger.info(exec_result)
