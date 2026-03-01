@@ -21,7 +21,9 @@ else:
 if "postgresql+asyncpg" in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("+asyncpg", "")
 
-engine = create_engine(DATABASE_URL, echo=True)
+SQL_ECHO = os.environ.get("SQL_ECHO", "False").lower() in ("true", "1", "t")
+
+engine = create_engine(DATABASE_URL, echo=SQL_ECHO)
 
 def init_db():
     retries = 10

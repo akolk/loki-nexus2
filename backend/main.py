@@ -7,14 +7,23 @@ from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import json
 import logging
+import os
+
+# Configure logging at application startup
+log_level_str = os.environ.get("LOG_LEVEL", "INFO").upper()
+log_level = getattr(logging, log_level_str, logging.INFO)
+
+logging.basicConfig(
+    level=log_level,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 from backend.database import engine, init_db
 from backend.models import User, Soul, ChatHistory, ResearchStep
 from backend.agent import run_agent, AgentDeps
 from backend.research_agent import run_research_agent
 from backend.scheduler import start_scheduler, add_job, scheduler
-
-logger = logging.getLogger("uvicorn.error")
 
 # Helper to get session
 def get_session():
