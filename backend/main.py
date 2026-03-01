@@ -2,10 +2,11 @@ from fastapi import FastAPI, Depends, Header, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlmodel import Session, select
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import json
+import logging
 
 from backend.database import engine, init_db
 from backend.models import User, Soul, ChatHistory, ResearchStep
@@ -13,10 +14,34 @@ from backend.agent import run_agent, AgentDeps
 from backend.research_agent import run_research_agent
 from backend.scheduler import start_scheduler, add_job, scheduler
 
+logger = logging.getLogger("uvicorn.error")
+
 # Helper to get session
 def get_session():
     with Session(engine) as session:
         yield session
+
+def get_current_user(
+    x_forwarded_user: str = Header("unknown_user", alias="x-forwarded-user"),
+    session: Session = Depends(get_session)
+) -> Tuple[User, Soul]:
+    statement = select(User).where(User.username == x_forwarded_user)
+    results = session.exec(statement)
+    user = results.first()
+
+    if not user:
+        user = User(username=x_forwarded_user, soul_data={"style": "concise", "preferences": {}})
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+    soul = Soul(
+        user_id=str(user.id),
+        username=user.username,
+        preferences=user.soul_data.get("preferences", {}),
+        style=user.soul_data.get("style", "concise")
+    )
+    return user, soul
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -39,26 +64,10 @@ class ResearchRequest(BaseModel):
 @app.post("/deep_research")
 async def deep_research_endpoint(
     request: ResearchRequest,
-    x_forwarded_user: str = Header("unknown_user", alias="x-forwarded-user"),
+    user_data: Tuple[User, Soul] = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
-    # Ensure user exists
-    statement = select(User).where(User.username == x_forwarded_user)
-    results = session.exec(statement)
-    user = results.first()
-
-    if not user:
-        user = User(username=x_forwarded_user, soul_data={"style": "concise", "preferences": {}})
-        session.add(user)
-        session.commit()
-        session.refresh(user)
-
-    soul = Soul(
-        user_id=str(user.id),
-        username=user.username,
-        preferences=user.soul_data.get("preferences", {}),
-        style=user.soul_data.get("style", "concise")
-    )
+    user, soul = user_data
 
     deps = AgentDeps(
         user_soul=soul,
@@ -69,6 +78,7 @@ async def deep_research_endpoint(
     try:
         agent_out = await run_research_agent(request.query, request.format, deps)
     except Exception as e:
+        logger.error(f"Error in deep_research_endpoint: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
     return agent_out
@@ -80,9 +90,11 @@ async def chat_endpoint(
     mcp_url: Optional[str] = Form(None),
     mcp_type: Optional[str] = Form(None),
     skill_file: Optional[UploadFile] = File(None),
-    x_forwarded_user: str = Header("unknown_user", alias="x-forwarded-user"),
+    user_data: Tuple[User, Soul] = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
+    user, soul = user_data
+
     # Parse bbox if provided
     bbox_dict = None
     if bbox:
@@ -90,24 +102,6 @@ async def chat_endpoint(
             bbox_dict = json.loads(bbox)
         except json.JSONDecodeError:
             raise HTTPException(status_code=400, detail="Invalid bbox format")
-
-    # Ensure user exists
-    statement = select(User).where(User.username == x_forwarded_user)
-    results = session.exec(statement)
-    user = results.first()
-
-    if not user:
-        user = User(username=x_forwarded_user, soul_data={"style": "concise", "preferences": {}})
-        session.add(user)
-        session.commit()
-        session.refresh(user)
-
-    soul = Soul(
-        user_id=str(user.id),
-        username=user.username,
-        preferences=user.soul_data.get("preferences", {}),
-        style=user.soul_data.get("style", "concise")
-    )
 
     deps = AgentDeps(
         user_soul=soul,
@@ -136,6 +130,7 @@ async def chat_endpoint(
         print(final_message)
         agent_out = await run_agent(final_message, deps)
     except Exception as e:
+        logger.error(f"Error in chat_endpoint: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
     response_text = agent_out["response"]
