@@ -22,7 +22,7 @@ from mcp.shared.exceptions import McpError
 from pydantic_ai_skills import SkillsToolset, SkillsDirectory
 import logging
 
-logger = logging.getLogger("uvicorn.error")
+logger = logging.getLogger(__name__)
 
 # Tools need to be importable functions or classes
 # We redefine tool functions here to be used by the agent decorator if needed,
