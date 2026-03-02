@@ -8,4 +8,4 @@ def map_content_to_frontend(content):
     elif isinstance(content, dict):
         return { "type": "dict", "content": content }
     else:
-        return { "type": "error", "content": {f"Error: unknown datatype {type(content)}."}
+        return { "type": "error", "content": {f"Error: unknown datatype {type(content)}."}}
