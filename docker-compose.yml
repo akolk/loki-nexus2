@@ -17,7 +17,6 @@ services:
       - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME}
       - OPENAI_API_VERSION=${OPENAI_API_VERSION:-2023-05-15}
     volumes:
-      - ./backend:/app/backend
       - ./backend/workspace:/app/backend/workspace
     depends_on:
       db:
@@ -32,9 +31,6 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
-    volumes:
-      - ./frontend:/usr/share/nginx/html
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - backend
     networks:
