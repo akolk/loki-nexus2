@@ -13,6 +13,8 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - LOG_LEVEL=info
       - OPENAI_API_VERSION=${OPENAI_API_VERSION:-2023-05-15}
+    volumes:
+      - ./backend/workspace:/app/backend/workspace
     depends_on:
       db:
         condition: service_healthy

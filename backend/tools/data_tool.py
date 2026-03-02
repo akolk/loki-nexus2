@@ -1,6 +1,9 @@
 import os
 import duckdb
+import logging
 from typing import List, Dict, Any, Optional
+
+logger = logging.getLogger(__name__)
 
 class DataTool:
     """
@@ -34,6 +37,8 @@ class DataTool:
         import re
         if not re.search(r'\blimit\b', sql_query, re.IGNORECASE):
             sql_query += f" LIMIT {limit}"
+
+        logger.info(f"Executing query: {sql_query}")
 
         try:
             import pandas as pd

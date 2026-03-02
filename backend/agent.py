@@ -1,13 +1,13 @@
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext, Tool
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 from backend.models import Soul, ResearchStep, ChatHistory
 from backend.tools.data_tool import DataTool
 from backend.tools.file_tool import read_file, write_file
+from backend.tools.result_tool import map_content_to_frontend
 from sqlmodel import Session, select
-from datetime import datetime
 import os
 import tempfile
 import zipfile
@@ -55,9 +55,24 @@ class AgentDeps:
     skill_file: Optional[UploadFile] = None
 
 class AgentResponse(BaseModel):
-    code: str
-    disclaimer: Optional[str]
-    followup: List[str]
+    answer: str = Field( 
+        ...,
+        description="Short description of the results or why the request cannot be fulfilled."
+    )
+    releated: List[str] = Field(
+        default=None,
+        max_length=3,
+        description="number of SHORT related follow-up USER questions a USER may ask."
+    )
+    code: Optional[str] = Field(
+        default=None,
+        description="Complete, runnable Python script (no backticks) that assigns the final output to `result`."
+    )
+    disclaimer: Optional[str] = Field(
+        default=None,
+        description="Short disclaimer about data quality, limitations if applicable and urls of datasets used."
+    )
+
 
 # Use a test model if API key is not present (for CI/build environment)
 # Pydantic AI uses `azure:<deployment-name>` for Azure OpenAI
@@ -152,7 +167,7 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
                 run_toolsets = toolsets + [mcp_toolset]
 
                 result = await agent.run(query, deps=deps, message_history=message_history, toolsets=run_toolsets)
-                return result.data
+                return result.output
 
     elif deps.mcp_url and deps.mcp_type == 'STDIO':
         # Assuming URL is the command for STDIO
@@ -160,7 +175,7 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
         if not cmd_parts:
             # Fallback if command is empty
             result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets)
-            return result.data
+            return result.output
 
         server_params = StdioServerParameters(command=cmd_parts[0], args=cmd_parts[1:])
         async with stdio_client(server_params) as (read_stream, write_stream):
@@ -172,12 +187,12 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
                 run_toolsets = toolsets + [mcp_toolset]
 
                 result = await agent.run(query, deps=deps, message_history=message_history, toolsets=run_toolsets)
-                return result.data
+                return result.output
     else:
         logger.info(query)
         result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets)
         logger.info(result)
-        return result.data
+        return result.output
 
 async def run_agent(query: str, deps: AgentDeps) -> dict:
     """
@@ -246,11 +261,24 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
 
     # Execute the generated Python code
     env = {}
+    exec_result = None
     try:
-        exec(agent_response.code, env)
-        exec_result = env.get("result")
-        if not exec_result:
-            exec_result = {"type": "error", "content": "Agent code executed but did not set the 'result' variable."}
+        if agent_response.code:
+            exec(agent_response.code, env)
+            if 'result' in env:
+                exec_result = map_content_to_frontend(env.get("result"))
+            else:
+                exec_result = {"type": "error", "content": "Agent code executed but did not set the 'result' variable."}
+        else:
+            exec_result = {
+                "type" : "answer", 
+                "content": { 
+                    "answer" : agent_response.answer,
+                    "releated": agent_response.related,
+                    "disclaimer": agent_response.disclaimer,
+                    "code": agent_response.code
+                }        
+            }
     except Exception as e:
         logger.error(f"Execution error of generated agent code: {e}", exc_info=True)
         exec_result = {"type": "error", "content": f"Execution error: {str(e)}"}
@@ -272,6 +300,11 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     deps.db_session.commit()
 
     return {
-        "response": f"Disclaimer: {agent_response.disclaimer}\n\nFollowups: {', '.join(agent_response.followup)}",
+        "response": {
+            "answer" : agent_response.answer,
+            "releated": agent_response.related,
+            "disclaimer": agent_response.disclaimer,
+            "code": agent_response.code
+        },
         "exec_result": exec_result
     }

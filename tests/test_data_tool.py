@@ -1,6 +1,7 @@
 import pytest
 from backend.tools.data_tool import DataTool, run_data_query
 import duckdb
+import math
 
 def test_execute_query_with_limit():
     tool = DataTool()
@@ -31,7 +32,6 @@ def test_execute_query_with_rd_coords():
     assert 5.0 < results[0]['wgs84_lon'] < 5.5
     assert 52.0 < results[0]['wgs84_lat'] < 52.3
 
-    import math
     # Row 2 (Invalid RD, wgs84 shouldn't be populated for this specific row,
     # but the column exists so it should be NaN)
     assert 'wgs84_lon' in results[1]
@@ -48,3 +48,11 @@ def test_run_data_query():
     # Helper wrapper test
     res = run_data_query("SELECT * FROM test_data")
     assert "Test Point" in res
+
+def test_execute_query_lazy_loading():
+    tool = DataTool()
+    # Create a dummy table and verify lazy limiting by trying a query that generates more rows than the limit
+    tool.con.execute("CREATE TABLE large_table AS SELECT * FROM range(150)")
+    results = tool.execute_query("SELECT * FROM large_table")
+    # Must enforce lazy limit of 100
+    assert len(results) == 100
