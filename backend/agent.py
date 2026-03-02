@@ -260,6 +260,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
 
     # Execute the generated Python code
     env = {}
+    exec_result = None
     try:
         if agent_response.code:
             exec(agent_response.code, env)
@@ -272,7 +273,8 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
                 "content": { 
                     "answer" : agent_response.answer,
                     "releated": agent_response.related,
-                    "disclaimer": agent_response.disclaimer
+                    "disclaimer": agent_response.disclaimer,
+                    "code": agent_response.code
                 }        
             }
     except Exception as e:
@@ -296,6 +298,11 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     deps.db_session.commit()
 
     return {
-        "response": agent_response,
+        "response": {
+            "answer" : agent_response.answer,
+            "releated": agent_response.related,
+            "disclaimer": agent_response.disclaimer,
+            "code": agent_response.code
+        },
         "exec_result": exec_result
     }
