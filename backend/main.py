@@ -140,7 +140,7 @@ async def chat_endpoint(
         print(final_message)
         agent_out = await run_agent(final_message, deps)
 
-        response_text = agent_out["response"]
+        response_text = agent_out["response"]["answer"]
         exec_result = agent_out["exec_result"]
 
         # Store model response
