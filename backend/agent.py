@@ -59,7 +59,7 @@ class AgentResponse(BaseModel):
         ...,
         description="Short description of the results or why the request cannot be fulfilled."
     )
-    releated: List[str] = Field(
+    related: List[str] = Field(
         default=None,
         max_length=3,
         description="number of SHORT related follow-up USER questions a USER may ask."
