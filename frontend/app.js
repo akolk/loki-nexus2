@@ -102,6 +102,205 @@ async function loadHistory() {
     }
 }
 
+// Helper to initialize drag-and-drop for post-its
+function makeDraggable(element, handle = element) {
+    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+
+    handle.onmousedown = dragMouseDown;
+
+    function dragMouseDown(e) {
+        // Prevent drag on buttons or inputs
+        if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+
+        e.preventDefault();
+        // get the mouse cursor position at startup:
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+
+        // bring to front
+        document.querySelectorAll('.postit-note, .postit-group').forEach(el => {
+            if(!el.classList.contains('pinned')) el.style.zIndex = "10";
+        });
+        if(!element.classList.contains('pinned')) element.style.zIndex = "100";
+
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
+    }
+
+    function elementDrag(e) {
+        e.preventDefault();
+        // calculate the new cursor position:
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        // set the element's new position:
+        element.style.top = (element.offsetTop - pos2) + "px";
+        element.style.left = (element.offsetLeft - pos1) + "px";
+    }
+
+    function closeDragElement() {
+        // stop moving when mouse button is released:
+        document.onmouseup = null;
+        document.onmousemove = null;
+
+        // Handle grouping logic
+        if (element.classList.contains('postit-note')) {
+            const groups = Array.from(document.querySelectorAll('.postit-group'));
+            const otherNotes = Array.from(document.querySelectorAll('.postit-note')).filter(n => n !== element && !n.closest('.postit-group'));
+
+            const elementRect = element.getBoundingClientRect();
+
+            // Check if dropped on a group
+            let droppedOnGroup = false;
+            for (let group of groups) {
+                const groupRect = group.getBoundingClientRect();
+                if (isColliding(elementRect, groupRect)) {
+                    group.querySelector('.postit-group-content').appendChild(element);
+                    element.style.top = 'auto';
+                    element.style.left = 'auto';
+                    droppedOnGroup = true;
+                    break;
+                }
+            }
+
+            // Check if dropped on another note to create a new group
+            if (!droppedOnGroup && !element.closest('.postit-group')) {
+                for (let otherNote of otherNotes) {
+                    const otherRect = otherNote.getBoundingClientRect();
+                    if (isColliding(elementRect, otherRect)) {
+                        createGroup([otherNote, element], otherRect.left, otherRect.top);
+                        break;
+                    }
+                }
+            }
+
+            // If dragging out of a group
+            if (!droppedOnGroup && element.closest('.postit-group')) {
+                const group = element.closest('.postit-group');
+                const groupRect = group.getBoundingClientRect();
+                if (!isColliding(elementRect, groupRect)) {
+                    document.getElementById('postit-container').appendChild(element);
+                    element.style.left = elementRect.left + 'px';
+                    element.style.top = elementRect.top + 'px';
+
+                    // remove group if empty
+                    const contentDiv = group.querySelector('.postit-group-content');
+                    if(contentDiv.children.length <= 1) {
+                        const remainingNotes = Array.from(contentDiv.children);
+                        remainingNotes.forEach(n => {
+                            document.getElementById('postit-container').appendChild(n);
+                            n.style.left = groupRect.left + 'px';
+                            n.style.top = groupRect.top + 'px';
+                        });
+                        group.remove();
+                    }
+                }
+            }
+        }
+    }
+}
+
+function isColliding(r1, r2) {
+    return !(r2.left > r1.right ||
+             r2.right < r1.left ||
+             r2.top > r1.bottom ||
+             r2.bottom < r1.top);
+}
+
+function createGroup(notes, left, top) {
+    const groupDiv = document.createElement("div");
+    groupDiv.className = "postit-group";
+    groupDiv.style.left = (left - 20) + "px";
+    groupDiv.style.top = (top - 20) + "px";
+
+    const header = document.createElement("div");
+    header.className = "postit-group-header";
+    header.innerHTML = `
+        <input type="text" value="New Group">
+        <button style="border:none;background:none;cursor:pointer;" onclick="this.closest('.postit-group').remove()">❌</button>
+    `;
+
+    const contentDiv = document.createElement("div");
+    contentDiv.className = "postit-group-content";
+
+    notes.forEach(note => {
+        note.style.left = 'auto';
+        note.style.top = 'auto';
+        contentDiv.appendChild(note);
+    });
+
+    groupDiv.appendChild(header);
+    groupDiv.appendChild(contentDiv);
+    document.getElementById('postit-container').appendChild(groupDiv);
+
+    makeDraggable(groupDiv, header);
+}
+
+function createPostit(execResult) {
+    const postit = document.createElement("div");
+    postit.className = "postit-note";
+
+    // Random slight rotation
+    const rotation = Math.random() * 6 - 3;
+    postit.style.transform = `rotate(${rotation}deg)`;
+
+    // Random position offset slightly from center
+    const x = window.innerWidth / 2 + (Math.random() * 200 - 100);
+    const y = window.innerHeight / 2 + (Math.random() * 200 - 100);
+    postit.style.left = `${x}px`;
+    postit.style.top = `${y}px`;
+
+    const header = document.createElement("div");
+    header.className = "postit-header";
+    header.innerHTML = `
+        <button title="Pin" onclick="this.closest('.postit-note').classList.toggle('pinned')">📌</button>
+        <button title="Delete" onclick="this.closest('.postit-note').remove()">✖</button>
+    `;
+
+    const content = document.createElement("div");
+    content.className = "postit-content";
+
+    const resDiv = document.createElement("div");
+    resDiv.className = "result-container";
+
+    if (execResult.type === "dataframe") {
+        resDiv.innerHTML = execResult.content;
+    } else if (execResult.type === "picture") {
+        const img = document.createElement("img");
+        img.src = execResult.content.startsWith('http') ? execResult.content : `data:image/png;base64,${execResult.content}`;
+        resDiv.appendChild(img);
+    } else if (execResult.type === "html") {
+        resDiv.innerHTML = execResult.content;
+    } else if (execResult.type === "plotly") {
+        try {
+            const plotData = typeof execResult.content === 'string' ? JSON.parse(execResult.content) : execResult.content;
+            const plotDivId = `plotly-${Math.random().toString(36).substr(2, 9)}`;
+            resDiv.id = plotDivId;
+            setTimeout(() => {
+                Plotly.newPlot(plotDivId, plotData.data, plotData.layout);
+            }, 100);
+        } catch (e) {
+            resDiv.innerHTML = `Error rendering Plotly chart: ${e}`;
+        }
+    } else if (execResult.type === "folium") {
+        const iframe = document.createElement("iframe");
+        iframe.srcdoc = execResult.content;
+        resDiv.appendChild(iframe);
+    } else {
+        resDiv.innerHTML = `<pre>${JSON.stringify(execResult.content, null, 2)}</pre>`;
+    }
+
+    content.appendChild(resDiv);
+    postit.appendChild(header);
+    postit.appendChild(content);
+
+    document.getElementById('postit-container').appendChild(postit);
+
+    makeDraggable(postit);
+}
+
+
 function appendMessage(role, content, execResult=null) {
     const msgDiv = document.createElement("div");
     msgDiv.className = `message ${role}`;
@@ -115,93 +314,97 @@ function appendMessage(role, content, execResult=null) {
     msgDiv.innerHTML = `<strong>${role}:</strong> <br>${formattedContent}`;
 
     if (execResult) {
-        const resDiv = document.createElement("div");
-        resDiv.className = "result-container";
-
-        if (execResult.type === "dataframe") {
-            // Assume content is HTML table string
-            resDiv.innerHTML = execResult.content;
-        } else if (execResult.type === "picture") {
-            // Assume content is base64 string or URL
-            const img = document.createElement("img");
-            img.src = execResult.content.startsWith('http') ? execResult.content : `data:image/png;base64,${execResult.content}`;
-            resDiv.appendChild(img);
-        } else if (execResult.type === "html") {
-            resDiv.innerHTML = execResult.content;
-        } else if (execResult.type === "plotly") {
-            // Assume content is JSON string for plotly layout/data
-            try {
-                const plotData = typeof execResult.content === 'string' ? JSON.parse(execResult.content) : execResult.content;
-                const plotDivId = `plotly-${Math.random().toString(36).substr(2, 9)}`;
-                resDiv.id = plotDivId;
-                setTimeout(() => {
-                    Plotly.newPlot(plotDivId, plotData.data, plotData.layout);
-                }, 100);
-            } catch (e) {
-                resDiv.innerHTML = `Error rendering Plotly chart: ${e}`;
-            }
-        } else if (execResult.type === "folium") {
-            // Assume content is HTML for an iframe
-            const iframe = document.createElement("iframe");
-            iframe.srcdoc = execResult.content;
-            resDiv.appendChild(iframe);
-        } else if (execResult.type === "geojson_map") {
-            let featuresCount = 0;
-            let tileServersCount = 0;
-
-            if (isMapMode && map) {
-                // Clear existing layers
-                if (currentGeoJsonLayer) {
-                    map.removeLayer(currentGeoJsonLayer);
-                    currentGeoJsonLayer = null;
-                }
-                currentTileServerLayers.forEach(layer => map.removeLayer(layer));
-                currentTileServerLayers = [];
-
-                if (execResult.content.features && execResult.content.features.length > 0) {
-                    currentGeoJsonLayer = L.geoJSON(execResult.content.features).addTo(map);
-                    // Fit bounds to the newly added layer
-                    if (currentGeoJsonLayer.getBounds().isValid()) {
-                        map.fitBounds(currentGeoJsonLayer.getBounds());
-                    }
-                    featuresCount = execResult.content.features.length;
-                }
-
-                if (execResult.content.tile_servers && execResult.content.tile_servers.length > 0) {
-                    execResult.content.tile_servers.forEach(ts => {
-                        const newLayer = L.tileLayer(ts.url, {
-                            attribution: ts.attribution || '',
-                            minZoom: ts.minZoom || 0,
-                            maxZoom: ts.maxZoom || 19
-                        }).addTo(map);
-                        currentTileServerLayers.push(newLayer);
-                    });
-                    tileServersCount = execResult.content.tile_servers.length;
-                }
-            }
-
-            // Output summary
-            const summary = document.createElement("p");
-            summary.innerHTML = `<em>Map updated with ${featuresCount} features and ${tileServersCount} tile servers.</em>`;
-            resDiv.appendChild(summary);
-
-            // Add the model's textual answer if present
-            if (execResult.content.answer) {
-                const answerText = document.createElement("div");
-                let formattedAnswer = execResult.content.answer;
-                if (typeof execResult.content.answer === 'string') {
-                    formattedAnswer = execResult.content.answer.replace(/\n/g, '<br>');
-                }
-                answerText.innerHTML = `<br>${formattedAnswer}`;
-                resDiv.appendChild(answerText);
-            }
-
+        if (!isMapMode && execResult.type !== "geojson_map") {
+            createPostit(execResult);
         } else {
-            // Fallback
-            resDiv.innerHTML = `<pre>${JSON.stringify(execResult.content, null, 2)}</pre>`;
-        }
+            const resDiv = document.createElement("div");
+            resDiv.className = "result-container";
 
-        msgDiv.appendChild(resDiv);
+            if (execResult.type === "dataframe") {
+                // Assume content is HTML table string
+                resDiv.innerHTML = execResult.content;
+            } else if (execResult.type === "picture") {
+                // Assume content is base64 string or URL
+                const img = document.createElement("img");
+                img.src = execResult.content.startsWith('http') ? execResult.content : `data:image/png;base64,${execResult.content}`;
+                resDiv.appendChild(img);
+            } else if (execResult.type === "html") {
+                resDiv.innerHTML = execResult.content;
+            } else if (execResult.type === "plotly") {
+                // Assume content is JSON string for plotly layout/data
+                try {
+                    const plotData = typeof execResult.content === 'string' ? JSON.parse(execResult.content) : execResult.content;
+                    const plotDivId = `plotly-${Math.random().toString(36).substr(2, 9)}`;
+                    resDiv.id = plotDivId;
+                    setTimeout(() => {
+                        Plotly.newPlot(plotDivId, plotData.data, plotData.layout);
+                    }, 100);
+                } catch (e) {
+                    resDiv.innerHTML = `Error rendering Plotly chart: ${e}`;
+                }
+            } else if (execResult.type === "folium") {
+                // Assume content is HTML for an iframe
+                const iframe = document.createElement("iframe");
+                iframe.srcdoc = execResult.content;
+                resDiv.appendChild(iframe);
+            } else if (execResult.type === "geojson_map") {
+                let featuresCount = 0;
+                let tileServersCount = 0;
+
+                if (isMapMode && map) {
+                    // Clear existing layers
+                    if (currentGeoJsonLayer) {
+                        map.removeLayer(currentGeoJsonLayer);
+                        currentGeoJsonLayer = null;
+                    }
+                    currentTileServerLayers.forEach(layer => map.removeLayer(layer));
+                    currentTileServerLayers = [];
+
+                    if (execResult.content.features && execResult.content.features.length > 0) {
+                        currentGeoJsonLayer = L.geoJSON(execResult.content.features).addTo(map);
+                        // Fit bounds to the newly added layer
+                        if (currentGeoJsonLayer.getBounds().isValid()) {
+                            map.fitBounds(currentGeoJsonLayer.getBounds());
+                        }
+                        featuresCount = execResult.content.features.length;
+                    }
+
+                    if (execResult.content.tile_servers && execResult.content.tile_servers.length > 0) {
+                        execResult.content.tile_servers.forEach(ts => {
+                            const newLayer = L.tileLayer(ts.url, {
+                                attribution: ts.attribution || '',
+                                minZoom: ts.minZoom || 0,
+                                maxZoom: ts.maxZoom || 19
+                            }).addTo(map);
+                            currentTileServerLayers.push(newLayer);
+                        });
+                        tileServersCount = execResult.content.tile_servers.length;
+                    }
+                }
+
+                // Output summary
+                const summary = document.createElement("p");
+                summary.innerHTML = `<em>Map updated with ${featuresCount} features and ${tileServersCount} tile servers.</em>`;
+                resDiv.appendChild(summary);
+
+                // Add the model's textual answer if present
+                if (execResult.content.answer) {
+                    const answerText = document.createElement("div");
+                    let formattedAnswer = execResult.content.answer;
+                    if (typeof execResult.content.answer === 'string') {
+                        formattedAnswer = execResult.content.answer.replace(/\n/g, '<br>');
+                    }
+                    answerText.innerHTML = `<br>${formattedAnswer}`;
+                    resDiv.appendChild(answerText);
+                }
+
+            } else {
+                // Fallback
+                resDiv.innerHTML = `<pre>${JSON.stringify(execResult.content, null, 2)}</pre>`;
+            }
+
+            msgDiv.appendChild(resDiv);
+        }
     }
 
     historyDiv.appendChild(msgDiv);
