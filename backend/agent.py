@@ -98,7 +98,7 @@ agent = Agent(
         "The `code` field MUST contain valid Python code. "
         "When your code executes, it MUST define a variable named `result` which is a dictionary containing: "
         "{'type': '...', 'content': '...'}. "
-        "Valid types are: 'dataframe', 'picture', 'html', 'plotly', 'folium'. "
+        "Valid types are: 'dataframe', 'text', 'plotly', 'geojson_map', 'features'. "
         "Do not assume any imports are pre-loaded; import everything you need in the code block. "
         "You have access to a SQL database (DuckDB) via the `run_data_query` tool if you need to inspect data while planning. "
         "You can also read and write files in your workspace. "
