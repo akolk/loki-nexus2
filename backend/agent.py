@@ -54,9 +54,24 @@ class AgentDeps:
     skill_file: Optional[UploadFile] = None
 
 class AgentResponse(BaseModel):
-    code: str
-    disclaimer: Optional[str]
-    followup: List[str]
+    answer: str = Field( 
+        ...,
+        description="Short description of the results or why the request cannot be fulfilled."
+    )
+    releated: List[str] = Field(
+        default=None,
+        max_length=3,
+        description="number of SHORT related follow-up USER questions a USER may ask."
+    )
+    code: Optional[str] = Field(
+        default=None,
+        description="Complete, runnable Python script (no backticks) that assigns the final output to `result`."
+    )
+    disclaimer: Optional[str] = Field(
+        default=None,
+        description="Short disclaimer about data quality, limitations if applicable and urls of datasets used."
+    )
+
 
 # Use a test model if API key is not present (for CI/build environment)
 # Pydantic AI uses `azure:<deployment-name>` for Azure OpenAI
@@ -246,10 +261,20 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     # Execute the generated Python code
     env = {}
     try:
-        exec(agent_response.code, env)
-        exec_result = env.get("result")
-        if not exec_result:
-            exec_result = {"type": "error", "content": "Agent code executed but did not set the 'result' variable."}
+        if agent_response.code:
+            exec(agent_response.code, env)
+            exec_result = env.get("result")
+            if not exec_result:
+                exec_result = {"type": "error", "content": "Agent code executed but did not set the 'result' variable."}
+        else:
+            exec_result = {
+                "type" : "answer", 
+                "content": { 
+                    "answer" : agent_response.answer,
+                    "releated": agent_response.related,
+                    "disclaimer": agent_response.disclaimer
+                }        
+            }
     except Exception as e:
         logger.error(f"Execution error of generated agent code: {e}", exc_info=True)
         exec_result = {"type": "error", "content": f"Execution error: {str(e)}"}
@@ -271,6 +296,6 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     deps.db_session.commit()
 
     return {
-        "response": f"Disclaimer: {agent_response.disclaimer}\n\nFollowups: {', '.join(agent_response.followup)}",
+        "response": agent_response,
         "exec_result": exec_result
     }
