@@ -1,5 +1,6 @@
 import pytest
-from backend.agent import read_file_tool, write_file_tool, run_data_query_tool
+from backend.agent import read_file_tool, write_file_tool, run_data_query_tool, AgentDeps
+from backend.models import Soul
 import os
 
 def test_read_file_tool():
@@ -18,3 +19,11 @@ def test_write_file_tool():
 def test_run_data_query_tool():
     res = run_data_query_tool("SELECT 'test' AS a")
     assert "[{'a': 'test'}]" in res
+
+def test_agent_deps_initialization():
+    soul = Soul(user_id="1", username="test_user", style="concise")
+    deps = AgentDeps(user_soul=soul, db_session=None, user_id=1)
+
+    assert deps.user_soul.username == "test_user"
+    assert deps.user_id == 1
+    assert deps.mcp_url is None

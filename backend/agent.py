@@ -1,4 +1,4 @@
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from pydantic import BaseModel
 from pydantic_ai import Agent, RunContext, Tool
@@ -7,7 +7,6 @@ from backend.models import Soul, ResearchStep, ChatHistory
 from backend.tools.data_tool import DataTool
 from backend.tools.file_tool import read_file, write_file
 from sqlmodel import Session, select
-from datetime import datetime
 import os
 import tempfile
 import zipfile

@@ -130,13 +130,13 @@ function appendMessage(role, content, execResult=null) {
             // Assume content is JSON string for plotly layout/data
             try {
                 const plotData = typeof execResult.content === 'string' ? JSON.parse(execResult.content) : execResult.content;
-                const plotDivId = 'plotly-' + Math.random().toString(36).substr(2, 9);
+                const plotDivId = `plotly-${Math.random().toString(36).substr(2, 9)}`;
                 resDiv.id = plotDivId;
                 setTimeout(() => {
                     Plotly.newPlot(plotDivId, plotData.data, plotData.layout);
                 }, 100);
             } catch (e) {
-                resDiv.innerHTML = "Error rendering Plotly chart: " + e;
+                resDiv.innerHTML = `Error rendering Plotly chart: ${e}`;
             }
         } else if (execResult.type === "folium") {
             // Assume content is HTML for an iframe
