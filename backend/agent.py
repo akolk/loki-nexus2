@@ -152,7 +152,7 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
                 run_toolsets = toolsets + [mcp_toolset]
 
                 result = await agent.run(query, deps=deps, message_history=message_history, toolsets=run_toolsets)
-                return result.data
+                return result.output
 
     elif deps.mcp_url and deps.mcp_type == 'STDIO':
         # Assuming URL is the command for STDIO
@@ -160,7 +160,7 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
         if not cmd_parts:
             # Fallback if command is empty
             result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets)
-            return result.data
+            return result.output
 
         server_params = StdioServerParameters(command=cmd_parts[0], args=cmd_parts[1:])
         async with stdio_client(server_params) as (read_stream, write_stream):
@@ -172,12 +172,12 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
                 run_toolsets = toolsets + [mcp_toolset]
 
                 result = await agent.run(query, deps=deps, message_history=message_history, toolsets=run_toolsets)
-                return result.data
+                return result.output
     else:
         logger.info(query)
         result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets)
         logger.info(result)
-        return result.data
+        return result.output
 
 async def run_agent(query: str, deps: AgentDeps) -> dict:
     """
