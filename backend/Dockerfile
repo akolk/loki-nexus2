@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.13.7-bookworm
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code
 COPY backend/ /app/backend/
-COPY frontend/ /app/frontend/
+#COPY frontend/ /app/frontend/
 
 # Create workspace directory
 RUN mkdir -p /app/backend/workspace
