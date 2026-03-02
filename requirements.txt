@@ -16,3 +16,4 @@ pandas
 geopandas
 psycopg2-binary
 pydantic-ai-skills
+folium
