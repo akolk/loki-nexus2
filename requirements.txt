@@ -12,12 +12,9 @@ requests
 python-multipart
 httpx
 pytest
-pandas
-geopandas
 psycopg2-binary
 pydantic-ai-skills
 fpdf==1.7.2
-folium==0.20.0
 SPARQLWrapper==2.0.0
 pandas==2.3.3
 openpyxl==3.1.5
