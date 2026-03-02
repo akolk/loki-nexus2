@@ -6,12 +6,14 @@ from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, Text
 from backend.models import Soul, ResearchStep, ChatHistory
 from backend.tools.data_tool import DataTool
 from backend.tools.file_tool import read_file, write_file
+from backend.tools.result_tool import map_content_to_frontend
 from sqlmodel import Session, select
 import os
 import tempfile
 import zipfile
 import shutil
 import asyncio
+from b
 
 from fastapi import UploadFile
 from mcp.client.stdio import stdio_client, StdioServerParameters
@@ -264,8 +266,9 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     try:
         if agent_response.code:
             exec(agent_response.code, env)
-            exec_result = env.get("result")
-            if not exec_result:
+            if 'result' in env:
+                exec_result = map_content_to_frontend(agent_response, env.get("result"))
+            else:
                 exec_result = {"type": "error", "content": "Agent code executed but did not set the 'result' variable."}
         else:
             exec_result = {
