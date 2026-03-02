@@ -106,6 +106,12 @@ agent = Agent(
         "If the data contains coordinates in RD (EPSG:28992), they will be automatically transformed to WGS84 by the tool, "
         "so you can focus on the analysis. "
         "Adapt your communication style to the user's preference defined in their Soul in the `disclaimer` or `followup`."
+        "### Directives for the `code` field"
+        "1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments."
+        "2. Case-Insensitive Comparisons: When performing string comparisons (e.g., in filters or groupings), always convert text to lowercase."
+        "3. When you group by year, you use ticks of 1 year in charts."
+        "4. For Map Visualizations use geopandas and return the features as geojson to the frontend."
+        "5. Final Output: The result of your script MUST be assigned to a variable named `result`."
     )
 )
 
