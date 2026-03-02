@@ -1,6 +1,6 @@
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext, Tool
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 from backend.models import Soul, ResearchStep, ChatHistory
