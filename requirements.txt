@@ -16,7 +16,6 @@ pandas
 geopandas
 psycopg2-binary
 pydantic-ai-skills
-folium
 fpdf==1.7.2
 folium==0.20.0
 SPARQLWrapper==2.0.0
