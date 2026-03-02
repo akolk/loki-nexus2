@@ -3,6 +3,8 @@ const historyDiv = document.getElementById("chat-history");
 const statusDiv = document.getElementById("status");
 let isMapMode = false;
 let map = null;
+let currentGeoJsonLayer = null;
+let currentTileServerLayers = [];
 
 function initMap() {
     if (map) return; // Prevent re-init
@@ -143,6 +145,57 @@ function appendMessage(role, content, execResult=null) {
             const iframe = document.createElement("iframe");
             iframe.srcdoc = execResult.content;
             resDiv.appendChild(iframe);
+        } else if (execResult.type === "geojson_map") {
+            let featuresCount = 0;
+            let tileServersCount = 0;
+
+            if (isMapMode && map) {
+                // Clear existing layers
+                if (currentGeoJsonLayer) {
+                    map.removeLayer(currentGeoJsonLayer);
+                    currentGeoJsonLayer = null;
+                }
+                currentTileServerLayers.forEach(layer => map.removeLayer(layer));
+                currentTileServerLayers = [];
+
+                if (execResult.content.features && execResult.content.features.length > 0) {
+                    currentGeoJsonLayer = L.geoJSON(execResult.content.features).addTo(map);
+                    // Fit bounds to the newly added layer
+                    if (currentGeoJsonLayer.getBounds().isValid()) {
+                        map.fitBounds(currentGeoJsonLayer.getBounds());
+                    }
+                    featuresCount = execResult.content.features.length;
+                }
+
+                if (execResult.content.tile_servers && execResult.content.tile_servers.length > 0) {
+                    execResult.content.tile_servers.forEach(ts => {
+                        const newLayer = L.tileLayer(ts.url, {
+                            attribution: ts.attribution || '',
+                            minZoom: ts.minZoom || 0,
+                            maxZoom: ts.maxZoom || 19
+                        }).addTo(map);
+                        currentTileServerLayers.push(newLayer);
+                    });
+                    tileServersCount = execResult.content.tile_servers.length;
+                }
+            }
+
+            // Output summary
+            const summary = document.createElement("p");
+            summary.innerHTML = `<em>Map updated with ${featuresCount} features and ${tileServersCount} tile servers.</em>`;
+            resDiv.appendChild(summary);
+
+            // Add the model's textual answer if present
+            if (execResult.content.answer) {
+                const answerText = document.createElement("div");
+                let formattedAnswer = execResult.content.answer;
+                if (typeof execResult.content.answer === 'string') {
+                    formattedAnswer = execResult.content.answer.replace(/\n/g, '<br>');
+                }
+                answerText.innerHTML = `<br>${formattedAnswer}`;
+                resDiv.appendChild(answerText);
+            }
+
         } else {
             // Fallback
             resDiv.innerHTML = `<pre>${JSON.stringify(execResult.content, null, 2)}</pre>`;
