@@ -7,3 +7,6 @@ backend/data.db
 backend/workspace/
 __pycache__/
 *.db
+venv/
+.coverage
+backend/workspace/test_write.txt

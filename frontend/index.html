@@ -35,8 +35,8 @@
         /* Settings Toggle Button (Hamburger) */
         #settings-toggle {
             position: absolute;
-            top: 20px; left: 20px;
-            z-index: 1002;
+            top: 80px; left: 20px;
+            z-index: 1000;
             background: white;
             padding: 10px 15px;
             border-radius: 5px;
@@ -54,6 +54,9 @@
             border-bottom: 1px solid #eee;
             font-weight: bold;
             font-size: 1.2em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .settings-section {
@@ -188,7 +191,10 @@
 
     <!-- Settings Sidebar Panel -->
     <div id="settings-sidebar" onmouseleave="closeSettings()">
-        <div class="settings-header">Settings</div>
+        <div class="settings-header">
+            <span>Settings</span>
+            <span style="cursor:pointer;" onclick="closeSettings()">&#x2715;</span>
+        </div>
 
         <div class="settings-section">
             <div id="mode-switcher" onclick="toggleMode()">

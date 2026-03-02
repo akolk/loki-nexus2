@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from sqlmodel import SQLModel, Field, JSON
 from pydantic import BaseModel
@@ -17,7 +17,7 @@ class Soul(BaseModel):
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(index=True, unique=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     # Storing soul data as JSON for flexibility
     soul_data: Dict[str, Any] = Field(default_factory=dict, sa_type=JSON)
 
@@ -25,7 +25,7 @@ class User(SQLModel, table=True):
 class ResearchStep(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     query: str
     thought_process: str
     code_generated: Optional[str] = None
@@ -36,6 +36,6 @@ class ResearchStep(SQLModel, table=True):
 class ChatHistory(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     role: str # "user" or "model"
     content: str

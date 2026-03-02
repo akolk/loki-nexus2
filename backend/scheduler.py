@@ -8,8 +8,7 @@ from sqlmodel import Session, select
 import logging
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("scheduler")
+logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler()
 
