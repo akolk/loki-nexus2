@@ -34,18 +34,12 @@
 
         /* Settings Toggle Button (Hamburger) */
         #settings-toggle {
-            position: absolute;
-            top: 80px; left: 20px;
-            z-index: 1000;
-            background: white;
-            padding: 10px 15px;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             cursor: pointer;
             font-weight: bold;
             font-size: 20px;
             user-select: none;
-            border: 1px solid #ccc;
+            padding: 5px;
+            margin-right: 10px;
         }
 
         .settings-header {
@@ -111,22 +105,23 @@
 
         /* Chat Window (Hidden by default) */
         #chat-window {
-            width: 350px;
-            height: 500px;
+            position: fixed;
+            top: 0; left: 0;
+            width: 400px;
+            max-width: 40%;
+            height: 100vh;
             background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: 4px 0 12px rgba(0,0,0,0.15);
             display: none;
             flex-direction: column;
-            margin-bottom: 15px;
-            border: 1px solid #ddd;
+            border-right: 1px solid #ddd;
+            z-index: 2001; /* Above bubble */
         }
 
         .chat-header {
             padding: 15px;
             background: #f8f9fa;
             border-bottom: 1px solid #eee;
-            border-radius: 10px 10px 0 0;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -175,6 +170,141 @@
         .result-container iframe { width: 100%; height: 300px; border: none; }
         table.dataframe { border-collapse: collapse; width: 100%; font-size: 0.8em; }
         table.dataframe th, table.dataframe td { border: 1px solid #ddd; padding: 4px; text-align: left; }
+
+        /* Post-it Notes Container */
+        #postit-container {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            pointer-events: none; /* Let clicks pass through except on notes */
+            z-index: 10;
+        }
+
+        /* Individual Post-it Note */
+        .postit-note {
+            position: absolute;
+            width: 300px;
+            background: #ffeb3b; /* Classic yellow */
+            background-image: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.05) 100%);
+            box-shadow: 2px 5px 10px rgba(0,0,0,0.3);
+            border-bottom-right-radius: 20px 5px;
+            padding: 15px;
+            pointer-events: auto; /* Catch clicks */
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', sans-serif;
+            color: #333;
+            cursor: move;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.1s, z-index 0.1s;
+        }
+
+        .postit-note:nth-child(even) {
+            background: #ffc107;
+        }
+        .postit-note:nth-child(3n) {
+            background: #8bc34a;
+        }
+        .postit-note:nth-child(5n) {
+            background: #03a9f4;
+            color: white;
+        }
+
+        /* Draggable Header for Note */
+        .postit-header {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 5px;
+            gap: 5px;
+        }
+
+        .postit-header button {
+            background: transparent;
+            border: none;
+            color: inherit;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 2px 5px;
+            opacity: 0.6;
+            border-radius: 0;
+        }
+        .postit-header button:hover {
+            opacity: 1;
+            background: rgba(0,0,0,0.1);
+        }
+
+        .postit-content {
+            flex: 1;
+            overflow: auto;
+            max-height: 400px;
+            /* Reset font for content to be readable */
+            font-family: sans-serif;
+            background: rgba(255,255,255,0.8);
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        /* Remove default result-container border in postit */
+        .postit-content .result-container {
+            border: none;
+            box-shadow: none;
+            margin-top: 0;
+            padding: 0;
+        }
+
+        .postit-note.pinned {
+            z-index: 1000 !important;
+            box-shadow: 0 0 10px 2px rgba(255, 0, 0, 0.5);
+        }
+
+        /* Post-it Group Container */
+        .postit-group {
+            position: absolute;
+            background: rgba(0,0,0,0.05);
+            border: 2px dashed #999;
+            padding: 10px;
+            border-radius: 10px;
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            min-width: 340px;
+            min-height: 200px;
+            z-index: 5;
+            cursor: move;
+        }
+
+        .postit-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            cursor: move;
+        }
+
+        .postit-group-header input {
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid #ccc;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            outline: none;
+            width: 70%;
+        }
+
+        .postit-group-content {
+            position: relative;
+            flex: 1;
+            min-height: 100px;
+        }
+
+        /* Notes inside a group */
+        .postit-group-content .postit-note {
+            position: relative;
+            margin-bottom: 10px;
+            transform: none !important;
+            box-shadow: 1px 2px 5px rgba(0,0,0,0.2);
+        }
+
     </style>
     <!-- Plotly JS -->
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
@@ -184,10 +314,8 @@
     <!-- Map Container -->
     <div id="map-container"></div>
 
-    <!-- Settings Toggle Button -->
-    <div id="settings-toggle" onclick="toggleSettings()" onmouseover="openSettings()">
-        &#9776;
-    </div>
+    <!-- Post-it Container -->
+    <div id="postit-container"></div>
 
     <!-- Settings Sidebar Panel -->
     <div id="settings-sidebar" onmouseleave="closeSettings()">
@@ -247,7 +375,10 @@
         <!-- Chat Window -->
         <div id="chat-window">
             <div class="chat-header">
-                <strong>Workspace Agent</strong>
+                <div style="display: flex; align-items: center;">
+                    <div id="settings-toggle" onclick="toggleSettings()" onmouseover="openSettings()">&#9776;</div>
+                    <strong>Workspace Agent</strong>
+                </div>
                 <div>
                     <span style="cursor:pointer;" onclick="toggleChat()">&#x2715;</span>
                 </div>
