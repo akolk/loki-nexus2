@@ -181,6 +181,23 @@ def get_history(
         logger.error(f"Error in get_history: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/history")
+def delete_history(
+    user_data: Tuple[User, Soul] = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    try:
+        user, _ = user_data
+        statement = select(ChatHistory).where(ChatHistory.user_id == user.id)
+        history = session.exec(statement).all()
+        for msg in history:
+            session.delete(msg)
+        session.commit()
+        return {"status": "History deleted"}
+    except Exception as e:
+        logger.error(f"Error in delete_history: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/jobs")
 def schedule_job(
     job: JobRequest,

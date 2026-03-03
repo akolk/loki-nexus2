@@ -1,6 +1,13 @@
 const username = "researcher_01";
 const historyDiv = document.getElementById("chat-history");
 const statusDiv = document.getElementById("status");
+const chatHeaderTitle = document.getElementById("chat-header-title");
+
+// Set the header title to "Hallo [username]"
+if (chatHeaderTitle) {
+    chatHeaderTitle.textContent = `Hallo ${username}`;
+}
+
 let isMapMode = false;
 let map = null;
 let currentGeoJsonLayer = null;
@@ -655,6 +662,31 @@ async function scheduleJob() {
         if (statusDiv) statusDiv.textContent = `Job Scheduled: ${data.status}`;
     } catch (e) {
         if (statusDiv) statusDiv.textContent = "Error scheduling job.";
+    }
+}
+
+function clearUIHistory() {
+    if (historyDiv) {
+        historyDiv.innerHTML = "";
+    }
+}
+
+async function clearDBHistory() {
+    try {
+        const response = await fetch("/history", {
+            method: "DELETE",
+            headers: {
+                "x-forwarded-user": username
+            }
+        });
+
+        if (response.ok) {
+            clearUIHistory();
+        } else {
+            console.error("Failed to clear DB history");
+        }
+    } catch (e) {
+        console.error("Error communicating with backend to clear DB history:", e);
     }
 }
 
