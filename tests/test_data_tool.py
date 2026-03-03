@@ -21,10 +21,14 @@ def test_execute_query_with_rd_coords():
     tool = DataTool()
     tool.con.execute("CREATE TABLE test_coords (id INTEGER, x INTEGER, y INTEGER)")
     tool.con.execute("INSERT INTO test_coords VALUES (1, 155000, 463000)") # Valid RD
-    tool.con.execute("INSERT INTO test_coords VALUES (2, -100, 463000)")    # Invalid RD
+    tool.con.execute("INSERT INTO test_coords VALUES (2, -100, 463000)")    # Invalid RD X
+    tool.con.execute("INSERT INTO test_coords VALUES (3, 155000, 700000)")  # Invalid RD Y
+    tool.con.execute("INSERT INTO test_coords VALUES (4, 400000, 463000)")  # Invalid RD X
+    tool.con.execute("INSERT INTO test_coords VALUES (5, 155000, 200000)")  # Invalid RD Y
+    tool.con.execute("INSERT INTO test_coords VALUES (6, NULL, NULL)")      # Null RD
 
     results = tool.execute_query("SELECT * FROM test_coords ORDER BY id")
-    assert len(results) == 2
+    assert len(results) == 6
 
     # Row 1 (Valid)
     assert 'wgs84_lon' in results[0]
@@ -32,10 +36,12 @@ def test_execute_query_with_rd_coords():
     assert 5.0 < results[0]['wgs84_lon'] < 5.5
     assert 52.0 < results[0]['wgs84_lat'] < 52.3
 
-    # Row 2 (Invalid RD, wgs84 shouldn't be populated for this specific row,
+    # Rows 2-6 (Invalid RD, wgs84 shouldn't be populated for this specific row,
     # but the column exists so it should be NaN)
-    assert 'wgs84_lon' in results[1]
-    assert math.isnan(results[1]['wgs84_lon'])
+    for i in range(1, 6):
+        assert 'wgs84_lon' in results[i]
+        assert math.isnan(results[i]['wgs84_lon'])
+        assert math.isnan(results[i]['wgs84_lat'])
 
 def test_execute_query_with_invalid_query():
     tool = DataTool()

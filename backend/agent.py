@@ -59,7 +59,7 @@ class AgentResponse(BaseModel):
         ...,
         description="Short description of the results or why the request cannot be fulfilled."
     )
-    releated: List[str] = Field(
+    related: List[str] = Field(
         default=None,
         max_length=3,
         description="number of SHORT related follow-up USER questions a USER may ask."
@@ -78,10 +78,10 @@ class AgentResponse(BaseModel):
 # Pydantic AI uses `azure:<deployment-name>` for Azure OpenAI
 # First check openai, then azure openai
 if os.environ.get("OPENAI_API_KEY"):
-    model_name_env = os.environ.get("OPENAI_MODEL_NAME", "gpt-5.1")
+    model_name_env = os.environ.get("OPENAI_MODEL_NAME", "gpt-5.2")
     model_name = f'openai:{model_name_env}'
 elif os.environ.get("AZURE_OPENAI_API_KEY"):
-    deployment_name = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.1")
+    deployment_name = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.2")
     model_name = f'azure:{deployment_name}'
 else:
     model_name = 'test'
@@ -96,9 +96,7 @@ agent = Agent(
         "Your goal is to help the user analyze data and answer questions by returning executable Python code. "
         "You MUST structure your response according to the defined schema. "
         "The `code` field MUST contain valid Python code. "
-        "When your code executes, it MUST define a variable named `result` which is a dictionary containing: "
-        "{'type': '...', 'content': '...'}. "
-        "Valid types are: 'dataframe', 'picture', 'html', 'plotly', 'folium'. "
+        "Valid types are: 'dataframe', 'text', 'plotly', 'geojson_map', 'features'. "
         "Do not assume any imports are pre-loaded; import everything you need in the code block. "
         "You have access to a SQL database (DuckDB) via the `run_data_query` tool if you need to inspect data while planning. "
         "You can also read and write files in your workspace. "
@@ -106,6 +104,29 @@ agent = Agent(
         "If the data contains coordinates in RD (EPSG:28992), they will be automatically transformed to WGS84 by the tool, "
         "so you can focus on the analysis. "
         "Adapt your communication style to the user's preference defined in their Soul in the `disclaimer` or `followup`."
+        "  "
+        "### Directives for the `code` field"
+        "1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments."
+        "2. Case-Insensitive Comparisons: When performing string comparisons (e.g., in filters or groupings), always convert text to lowercase."
+        "3. When you group by year, you use ticks of 1 year in charts."
+        "4. For Map Visualizations use geopandas or folium and return the features as geojson to the frontend."
+        "5. For Interactive Graphs use plotly.graph_objects.Figure instead of matplotlib."
+        "6. Final Output: The result of your script MUST be assigned to a variable named `result`."
+        "  "
+        "### Output Requirements for `result` variable"
+        "1. Allowed Types:"
+        "    - folium.Map"
+        "    - plotly.graph_objects.Figure"
+        "    - pandas.DataFrame"
+        "    - {{'type': 'download', 'data': bytes, 'filename': str, 'mime': str, 'label': str}}"
+        "    - str"
+        "2. Prioritize visualizing results as a folium.Map or plotly.graph_objects.Figure. If neither is possible, use a pandas.DataFrame or str, in that order."
+        "3. Visualization Style:"
+        "    - Folium: use a high-contrast color for geometry and light colors for the map. Zoomlevel should show all geometries."
+        "    - Plotly: default theme with clear titles and axis labels."
+        "4. The `code` string must contain only raw Python code (with `result` variable), no surrounding backticks or markdown."
+        "  "
+        "If no code is needed, set `code` to null and provide an explanation in `answer`."
     )
 )
 
@@ -203,7 +224,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     toolsets = []
     tmp_dir = None
 
-    logger.info(deps)
+    logger.debug(deps)
 
     # Load skill file if provided
     if deps.skill_file:
@@ -264,9 +285,11 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     exec_result = None
     try:
         if agent_response.code:
+            print(agent_response.code)
             exec(agent_response.code, env)
             if 'result' in env:
                 exec_result = map_content_to_frontend(env.get("result"))
+                print(exec_result);
             else:
                 exec_result = {"type": "error", "content": "Agent code executed but did not set the 'result' variable."}
         else:
@@ -283,7 +306,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
         logger.error(f"Execution error of generated agent code: {e}", exc_info=True)
         exec_result = {"type": "error", "content": f"Execution error: {str(e)}"}
 
-    logger.info(exec_result)
+    logger.debug(exec_result)
     # Determine model string for metadata
     model_name_str = str(model_name)
 

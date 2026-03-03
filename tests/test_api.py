@@ -15,7 +15,7 @@ client = TestClient(app)
 @patch("backend.main.run_agent")
 def test_chat_flow(mock_run_agent):
     # Setup mock
-    mock_run_agent.return_value = {"response": "Mocked Agent Response", "exec_result": None}
+    mock_run_agent.return_value = {"response": {"answer": "Mocked Agent Response"}, "exec_result": None}
 
     # Setup DB
     init_db()
@@ -52,7 +52,7 @@ def test_job_scheduling():
     # Ensure user exists first (re-using client state if persistent, but safe to re-init)
     # We need to mock run_agent here too implicitly because /chat calls it
     with patch("backend.main.run_agent") as mock_run:
-        mock_run.return_value = {"response": "ack", "exec_result": None}
+        mock_run.return_value = {"response": {"answer": "ack"}, "exec_result": None}
         client.post(
             "/chat",
             data={"message": "Init user"},
