@@ -287,8 +287,15 @@ function createPostit(execResult) {
             const plotData = typeof execResult.content === 'string' ? JSON.parse(execResult.content) : execResult.content;
             const plotDivId = `plotly-${Math.random().toString(36).substr(2, 9)}`;
             resDiv.id = plotDivId;
+            resDiv.style.width = '100%';
+            resDiv.style.height = '100%';
             setTimeout(() => {
-                Plotly.newPlot(plotDivId, plotData.data, plotData.layout);
+                Plotly.newPlot(plotDivId, plotData.data, plotData.layout).then(() => {
+                    const ro = new ResizeObserver(() => {
+                        Plotly.Plots.resize(plotDivId);
+                    });
+                    ro.observe(resDiv);
+                });
             }, 100);
         } catch (e) {
             resDiv.innerHTML = `Error rendering Plotly chart: ${e}`;
@@ -396,8 +403,15 @@ function appendMessage(role, content, execResult=null, related=[]) {
                     const plotData = typeof execResult.content === 'string' ? JSON.parse(execResult.content) : execResult.content;
                     const plotDivId = `plotly-${Math.random().toString(36).substr(2, 9)}`;
                     resDiv.id = plotDivId;
+                    resDiv.style.width = '100%';
+                    resDiv.style.height = '100%';
                     setTimeout(() => {
-                        Plotly.newPlot(plotDivId, plotData.data, plotData.layout);
+                        Plotly.newPlot(plotDivId, plotData.data, plotData.layout).then(() => {
+                            const ro = new ResizeObserver(() => {
+                                Plotly.Plots.resize(plotDivId);
+                            });
+                            ro.observe(resDiv);
+                        });
                     }, 100);
                 } catch (e) {
                     resDiv.innerHTML = `Error rendering Plotly chart: ${e}`;
