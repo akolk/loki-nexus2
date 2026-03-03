@@ -83,7 +83,14 @@ function toggleChat() {
         chatWindow.style.display = "none";
         chatBubble.style.display = "flex";
     }
+
+    // Recalculate maximized post-its if any
+    document.querySelectorAll('.postit-note.maximized').forEach(recalcMaximizedPostit);
 }
+
+window.addEventListener('resize', () => {
+    document.querySelectorAll('.postit-note.maximized').forEach(recalcMaximizedPostit);
+});
 
 async function loadHistory() {
     try {
@@ -117,11 +124,14 @@ function makeDraggable(element, handle = element) {
         pos3 = e.clientX;
         pos4 = e.clientY;
 
+        // Prevent drag if maximized
+        if (element.classList.contains('maximized')) return;
+
         // bring to front
         document.querySelectorAll('.postit-note, .postit-group').forEach(el => {
-            if(!el.classList.contains('pinned')) el.style.zIndex = "10";
+            if(!el.classList.contains('pinned') && !el.classList.contains('maximized')) el.style.zIndex = "10";
         });
-        if(!element.classList.contains('pinned')) element.style.zIndex = "100";
+        if(!element.classList.contains('pinned') && !element.classList.contains('maximized')) element.style.zIndex = "100";
 
         document.onmouseup = closeDragElement;
         document.onmousemove = elementDrag;
@@ -254,8 +264,8 @@ function createPostit(execResult) {
     const header = document.createElement("div");
     header.className = "postit-header";
     header.innerHTML = `
-        <button title="Pin" onclick="this.closest('.postit-note').classList.toggle('pinned')">📌</button>
-        <button title="Delete" onclick="this.closest('.postit-note').remove()">✖</button>
+        <button title="Pin" onclick="this.closest('.postit-note').classList.toggle('pinned'); event.stopPropagation();">📌</button>
+        <button title="Delete" onclick="this.closest('.postit-note').remove(); event.stopPropagation();">✖</button>
     `;
 
     const content = document.createElement("div");
@@ -295,9 +305,59 @@ function createPostit(execResult) {
     postit.appendChild(header);
     postit.appendChild(content);
 
+    postit.ondblclick = (e) => {
+        // Don't maximize if clicking on the header buttons
+        if (e.target.tagName === 'BUTTON') return;
+        toggleMaximize(postit);
+    };
+
     document.getElementById('postit-container').appendChild(postit);
 
     makeDraggable(postit);
+}
+
+function toggleMaximize(postit) {
+    if (postit.classList.contains('maximized')) {
+        // Restore original size/position
+        postit.classList.remove('maximized');
+        postit.style.width = postit.dataset.origWidth || '';
+        postit.style.height = postit.dataset.origHeight || '';
+        postit.style.top = postit.dataset.origTop || '';
+        postit.style.left = postit.dataset.origLeft || '';
+        postit.style.transform = postit.dataset.origTransform || '';
+        postit.style.zIndex = postit.dataset.origZIndex || '';
+    } else {
+        // Store original size/position
+        postit.dataset.origWidth = postit.style.width || postit.offsetWidth + 'px';
+        postit.dataset.origHeight = postit.style.height || postit.offsetHeight + 'px';
+        postit.dataset.origTop = postit.style.top;
+        postit.dataset.origLeft = postit.style.left;
+        postit.dataset.origTransform = postit.style.transform;
+        postit.dataset.origZIndex = postit.style.zIndex;
+
+        postit.classList.add('maximized');
+        recalcMaximizedPostit(postit);
+    }
+}
+
+function recalcMaximizedPostit(postit) {
+    if (!postit || !postit.classList.contains('maximized')) return;
+
+    const chatWindow = document.getElementById("chat-window");
+    const isChatVisible = chatWindow.style.display === "flex";
+
+    if (isChatVisible) {
+        const chatRect = chatWindow.getBoundingClientRect();
+        postit.style.left = chatRect.right + 'px';
+        postit.style.width = (window.innerWidth - chatRect.right) + 'px';
+    } else {
+        postit.style.left = '0px';
+        postit.style.width = '100vw';
+    }
+
+    postit.style.top = '0px';
+    postit.style.height = '100vh';
+    postit.style.transform = 'none';
 }
 
 
