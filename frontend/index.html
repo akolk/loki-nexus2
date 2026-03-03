@@ -221,7 +221,16 @@
             cursor: move;
             display: flex;
             flex-direction: column;
-            transition: transform 0.1s, z-index 0.1s;
+            transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), left 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), width 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), height 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), border-radius 0.4s ease-in-out;
+            box-sizing: border-box;
+        }
+
+        .postit-note.maximized {
+            z-index: 1999 !important; /* Just below chat widget (2000) */
+            border-radius: 0;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            cursor: default; /* No longer draggable */
+            /* width, height, top, left, transform will be handled in JS */
         }
 
         .postit-note:nth-child(even) {
@@ -267,6 +276,11 @@
             background: rgba(255,255,255,0.8);
             padding: 5px;
             border-radius: 4px;
+        }
+
+        .postit-note.maximized .postit-content {
+            max-height: none;
+            height: 100%;
         }
 
         /* Remove default result-container border in postit */
