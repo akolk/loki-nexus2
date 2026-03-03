@@ -285,9 +285,11 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     exec_result = None
     try:
         if agent_response.code:
+            print(agent_response.code)
             exec(agent_response.code, env)
             if 'result' in env:
                 exec_result = map_content_to_frontend(env.get("result"))
+                print(exec_result);
             else:
                 exec_result = {"type": "error", "content": "Agent code executed but did not set the 'result' variable."}
         else:
