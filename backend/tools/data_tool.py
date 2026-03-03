@@ -76,6 +76,8 @@ class DataTool:
             if mask.any():
                 transformer = pyproj.Transformer.from_crs("EPSG:28992", "EPSG:4326", always_xy=True)
                 # Apply transformation only on valid rows
+                # NOTE: EPSG:4326 is lon/lat order when always_xy=True
+                # transformer.transform with always_xy=True returns (lon, lat)
                 lon, lat = transformer.transform(x_num[mask].values, y_num[mask].values)
 
                 # Initialize columns if they don't exist

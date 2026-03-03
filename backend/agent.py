@@ -78,10 +78,10 @@ class AgentResponse(BaseModel):
 # Pydantic AI uses `azure:<deployment-name>` for Azure OpenAI
 # First check openai, then azure openai
 if os.environ.get("OPENAI_API_KEY"):
-    model_name_env = os.environ.get("OPENAI_MODEL_NAME", "gpt-5.1")
+    model_name_env = os.environ.get("OPENAI_MODEL_NAME", "gpt-5.2")
     model_name = f'openai:{model_name_env}'
 elif os.environ.get("AZURE_OPENAI_API_KEY"):
-    deployment_name = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.1")
+    deployment_name = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.2")
     model_name = f'azure:{deployment_name}'
 else:
     model_name = 'test'
