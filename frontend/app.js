@@ -381,7 +381,7 @@ function appendMessage(role, content, execResult=null, related=[]) {
     msgDiv.innerHTML = `<strong>${role}:</strong> <br>${formattedContent}`;
 
     if (execResult) {
-        if (!isMapMode && execResult.type !== "geojson_map") {
+        if (!isMapMode && execResult.type !== "geojson_map" && execResult.type !== "FeatureCollection") {
             createPostit(execResult);
         } else {
             const resDiv = document.createElement("div");
@@ -421,7 +421,7 @@ function appendMessage(role, content, execResult=null, related=[]) {
                 const iframe = document.createElement("iframe");
                 iframe.srcdoc = execResult.content;
                 resDiv.appendChild(iframe);
-            } else if (execResult.type === "geojson_map") {
+            } else if (execResult.type === "geojson_map" || execResult.type === "FeatureCollection") {
                 let featuresCount = 0;
                 let tileServersCount = 0;
 
@@ -434,17 +434,36 @@ function appendMessage(role, content, execResult=null, related=[]) {
                     currentTileServerLayers.forEach(layer => map.removeLayer(layer));
                     currentTileServerLayers = [];
 
-                    if (execResult.content.features && execResult.content.features.length > 0) {
-                        currentGeoJsonLayer = L.geoJSON(execResult.content.features).addTo(map);
+                    let featuresData = execResult.type === "FeatureCollection" ? execResult.features : execResult.content.features;
+
+                    if (featuresData && featuresData.length > 0) {
+                        currentGeoJsonLayer = L.geoJSON(featuresData, {
+                            onEachFeature: function (feature, layer) {
+                                if (feature.properties) {
+                                    let popupContent = '<div style="max-height: 200px; overflow-y: auto;">';
+                                    popupContent += '<table class="table table-sm table-striped" style="margin-bottom:0;"><tbody>';
+                                    for (let key in feature.properties) {
+                                        let val = feature.properties[key];
+                                        if (val !== null && val !== undefined) {
+                                            popupContent += `<tr><th>${key}</th><td>${val}</td></tr>`;
+                                        }
+                                    }
+                                    popupContent += '</tbody></table></div>';
+                                    layer.bindPopup(popupContent);
+                                }
+                            }
+                        }).addTo(map);
+
                         // Fit bounds to the newly added layer
                         if (currentGeoJsonLayer.getBounds().isValid()) {
                             map.fitBounds(currentGeoJsonLayer.getBounds());
                         }
-                        featuresCount = execResult.content.features.length;
+                        featuresCount = featuresData.length;
                     }
 
-                    if (execResult.content.tile_servers && execResult.content.tile_servers.length > 0) {
-                        execResult.content.tile_servers.forEach(ts => {
+                    let tileServersData = execResult.type === "FeatureCollection" ? [] : (execResult.content.tile_servers || []);
+                    if (tileServersData && tileServersData.length > 0) {
+                        tileServersData.forEach(ts => {
                             const newLayer = L.tileLayer(ts.url, {
                                 attribution: ts.attribution || '',
                                 minZoom: ts.minZoom || 0,
@@ -452,21 +471,64 @@ function appendMessage(role, content, execResult=null, related=[]) {
                             }).addTo(map);
                             currentTileServerLayers.push(newLayer);
                         });
-                        tileServersCount = execResult.content.tile_servers.length;
+                        tileServersCount = tileServersData.length;
                     }
                 }
 
                 // Output summary
                 const summary = document.createElement("p");
-                summary.innerHTML = `<em>Map updated with ${featuresCount} features and ${tileServersCount} tile servers.</em>`;
+                if (execResult.type === "FeatureCollection") {
+                    summary.innerHTML = `<em>Map updated with ${featuresCount} features.</em>`;
+
+                    if (execResult.links && execResult.links.length > 0) {
+                        let linksContainer = document.createElement("div");
+                        linksContainer.style.marginTop = "10px";
+
+                        let linksTable = `<table class="table table-sm" style="font-size: 0.9em;">
+                            <thead><tr><th>Title</th><th>Link</th></tr></thead><tbody>`;
+
+                        let nextLink = null;
+
+                        execResult.links.forEach(link => {
+                            linksTable += `<tr>
+                                <td>${link.title || link.rel}</td>
+                                <td><a href="${link.href}" target="_blank" style="word-break: break-all;">${link.href}</a></td>
+                            </tr>`;
+                            if (link.rel === "next") {
+                                nextLink = link.href;
+                            }
+                        });
+                        linksTable += `</tbody></table>`;
+
+                        linksContainer.innerHTML = linksTable;
+
+                        if (nextLink) {
+                            let nextBtn = document.createElement("button");
+                            nextBtn.className = "btn btn-primary btn-sm mt-2";
+                            nextBtn.textContent = "Load Next Features";
+                            nextBtn.onclick = () => {
+                                // Fetch next features from URL if possible, or trigger chat message
+                                const input = document.getElementById("message-input");
+                                input.value = `Load next features from: ${nextLink}`;
+                                sendMessage();
+                            };
+                            linksContainer.appendChild(nextBtn);
+                        }
+
+                        summary.appendChild(linksContainer);
+                    }
+                } else {
+                    summary.innerHTML = `<em>Map updated with ${featuresCount} features and ${tileServersCount} tile servers.</em>`;
+                }
                 resDiv.appendChild(summary);
 
                 // Add the model's textual answer if present
-                if (execResult.content.answer) {
+                let answerData = execResult.type === "FeatureCollection" ? null : execResult.content.answer;
+                if (answerData) {
                     const answerText = document.createElement("div");
-                    let formattedAnswer = execResult.content.answer;
-                    if (typeof execResult.content.answer === 'string') {
-                        formattedAnswer = execResult.content.answer.replace(/\n/g, '<br>');
+                    let formattedAnswer = answerData;
+                    if (typeof answerData === 'string') {
+                        formattedAnswer = answerData.replace(/\n/g, '<br>');
                     }
                     answerText.innerHTML = `<br>${formattedAnswer}`;
                     resDiv.appendChild(answerText);
