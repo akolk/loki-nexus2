@@ -140,6 +140,32 @@
         .user { background: #e3f2fd; align-self: flex-end; border-bottom-right-radius: 2px; }
         .model { background: #f1f8e9; align-self: flex-start; border-bottom-left-radius: 2px; }
 
+        .related-bubbles-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 5px;
+        }
+
+        .related-bubble {
+            background: #fff;
+            color: #007bff;
+            border: 1px solid #007bff;
+            border-radius: 20px;
+            padding: 5px 10px;
+            font-size: 0.8em;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+            display: inline-block;
+            max-width: 100%;
+            word-wrap: break-word;
+        }
+
+        .related-bubble:hover {
+            background: #007bff;
+            color: #fff;
+        }
+
         .chat-footer {
             padding: 10px;
             border-top: 1px solid #eee;
