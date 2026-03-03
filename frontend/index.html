@@ -417,9 +417,11 @@
             <div class="chat-header">
                 <div style="display: flex; align-items: center;">
                     <div id="settings-toggle" onclick="toggleSettings()" onmouseover="openSettings()">&#9776;</div>
-                    <strong>Workspace Agent</strong>
+                    <strong id="chat-header-title">Workspace Agent</strong>
                 </div>
                 <div>
+                    <button style="border:none;background:none;cursor:pointer;font-size:16px;margin-right:5px;" onclick="clearUIHistory()" title="Clear Chat Window">🧹</button>
+                    <button style="border:none;background:none;cursor:pointer;font-size:16px;margin-right:10px;" onclick="clearDBHistory()" title="Clear DB History">🗑️</button>
                     <span style="cursor:pointer;" onclick="toggleChat()">&#x2715;</span>
                 </div>
             </div>
