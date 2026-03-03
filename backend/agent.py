@@ -209,7 +209,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     toolsets = []
     tmp_dir = None
 
-    logger.info(deps)
+    logger.debug(deps)
 
     # Load skill file if provided
     if deps.skill_file:
@@ -289,7 +289,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
         logger.error(f"Execution error of generated agent code: {e}", exc_info=True)
         exec_result = {"type": "error", "content": f"Execution error: {str(e)}"}
 
-    logger.info(exec_result)
+    logger.debug(exec_result)
     # Determine model string for metadata
     model_name_str = str(model_name)
 
