@@ -1,5 +1,4 @@
 import numpy as np
-import folium as fo
 import pandas as pd
 import xgboost as xgb
 import sklearn as skl
@@ -7,7 +6,6 @@ import streamlit as st
 import geopandas as gpd
 import plotly.express as px
 import plotly.graph_objects as go
-
 
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
@@ -117,7 +115,7 @@ agent = Agent(
         - You can access the PDOK OGC APIS or the ODATA CBS APIS
         - Access them via the dictionary: dataframes['/datasets/subdir/name.csv']. Non-geometry columns may contain missing values, the hardened code should handle this.
         - All GeoDataFrames are in EPSG:4326 (WGS84). Never modify geometry CRS.
-        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, fo, gpd, dataframes, sklearn, xgb
+        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb
         - The available dataframes and their schemas are:
 
         ### Directives for the `code` field
@@ -304,7 +302,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
     # Execute the generated Python code
-    exec_globals = { "np": np, "pd": pd, "px": px, "go": go, "fo": fo, "gpd": gpd, "xgb": xgb, "skl": skl }
+    exec_globals = { "np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl }
     allowed_globals = set(exec_globals.keys())
     
     exec_result = None
