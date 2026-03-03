@@ -142,13 +142,18 @@ async def chat_endpoint(
 
         response_text = agent_out["response"]["answer"]
         exec_result = agent_out["exec_result"]
+        related = agent_out["response"].get("related", [])
+
+        # Ensure we only return up to three related questions
+        if related:
+            related = related[:3]
 
         # Store model response
         model_msg = ChatHistory(user_id=user.id, role="model", content=response_text)
         session.add(model_msg)
         session.commit()
 
-        return {"response": response_text, "exec_result": exec_result}
+        return {"response": response_text, "exec_result": exec_result, "related": related}
     except HTTPException:
         raise
     except Exception as e:

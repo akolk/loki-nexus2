@@ -301,7 +301,7 @@ function createPostit(execResult) {
 }
 
 
-function appendMessage(role, content, execResult=null) {
+function appendMessage(role, content, execResult=null, related=[]) {
     const msgDiv = document.createElement("div");
     msgDiv.className = `message ${role}`;
 
@@ -407,6 +407,25 @@ function appendMessage(role, content, execResult=null) {
         }
     }
 
+    if (role === 'model' && related && related.length > 0) {
+        const relatedContainer = document.createElement("div");
+        relatedContainer.className = "related-bubbles-container";
+
+        related.slice(0, 3).forEach(question => {
+            const bubble = document.createElement("div");
+            bubble.className = "related-bubble";
+            bubble.textContent = question;
+            bubble.onclick = () => {
+                const input = document.getElementById("message-input");
+                input.value = question;
+                sendMessage();
+            };
+            relatedContainer.appendChild(bubble);
+        });
+
+        msgDiv.appendChild(relatedContainer);
+    }
+
     historyDiv.appendChild(msgDiv);
     scrollToBottom();
 }
@@ -462,9 +481,9 @@ async function sendMessage() {
 
         const data = await response.json();
         if (data.exec_result) {
-            appendMessage("model", data.response, data.exec_result);
+            appendMessage("model", data.response, data.exec_result, data.related);
         } else {
-            appendMessage("model", data.response);
+            appendMessage("model", data.response, null, data.related);
         }
 
     } catch (e) {
