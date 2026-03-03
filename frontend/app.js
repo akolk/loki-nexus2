@@ -616,6 +616,8 @@ async function sendMessage() {
         });
 
         const data = await response.json();
+        console.log("Backend response:", data);
+        console.log("Exec result type:", data.exec_result ? data.exec_result.type : "none");
         if (data.exec_result) {
             appendMessage("model", data.response, data.exec_result, data.related);
         } else {
