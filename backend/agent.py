@@ -1,3 +1,14 @@
+import numpy as np
+import folium as fo
+import pandas as pd
+import xgboost as xgb
+import sklearn as skl
+import streamlit as st
+import geopandas as gpd
+import plotly.express as px
+import plotly.graph_objects as go
+
+
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
@@ -215,6 +226,18 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
         logger.info(result)
         return result.output
 
+def get_result(exec_globals, allowed_globals):
+    result = copy.deepcopy(exec_globals["result"]) if "result" in exec_globals else None
+    if "rows_used" in exec_globals:
+        rows_used = (exec_globals["rows_used"] or 0)
+        st.session_state.rows_used += rows_used if isinstance(rows_used, int) else 0
+
+    for key in list(exec_globals.keys()):
+        if key not in allowed_globals and not key.startswith("__"):
+            del exec_globals[key]
+
+    return result
+
 async def run_agent(query: str, deps: AgentDeps) -> dict:
     """
     Runs the agent and stores the result in the DB.
@@ -281,14 +304,19 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
     # Execute the generated Python code
-    env = {}
+    exec_globals = { "np": np, "pd": pd, "px": px, "go": go, "fo": fo, "gpd": gpd, "xgb": xgb, "skl": skl }
+    allowed_globals = set(exec_globals.keys())
+    
     exec_result = None
     try:
         if agent_response.code:
             print(agent_response.code)
             exec(agent_response.code, env)
-            if 'result' in env:
-                exec_result = map_content_to_frontend(env.get("result"))
+
+            result = get_result(exec_globals, allowed_globals)
+            
+            if result is not None:
+                exec_result = map_content_to_frontend(result)
                 print(exec_result);
             else:
                 exec_result = {"type": "error", "content": "Agent code executed but did not set the 'result' variable."}
