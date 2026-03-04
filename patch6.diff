@@ -1,0 +1,5 @@
+<<<<<<< SEARCH
+        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb. DO NOT USE matplotlib, folium, or mapbox.
+=======
+        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb. DO NOT USE matplotlib, folium, mapbox, or other external libraries.
+>>>>>>> REPLACE
