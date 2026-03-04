@@ -9,8 +9,6 @@ import plotly.graph_objects as go
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent, RunContext, Tool
-from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 from backend.models import Soul, ResearchStep, ChatHistory
 from backend.tools.data_tool import DataTool
 from backend.tools.file_tool import read_file, write_file
@@ -23,20 +21,18 @@ import copy
 import zipfile
 import shutil
 import asyncio
+import json
 
 from fastapi import UploadFile
 from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.sse import sse_client
 from mcp.client.session import ClientSession
 from mcp.shared.exceptions import McpError
-from pydantic_ai_skills import SkillsToolset, SkillsDirectory
 import logging
 
-logger = logging.getLogger(__name__)
+from openai import AsyncOpenAI, AsyncAzureOpenAI
 
-# Tools need to be importable functions or classes
-# We redefine tool functions here to be used by the agent decorator if needed,
-# or use the class methods directly if wrapped.
+logger = logging.getLogger(__name__)
 
 def run_data_query_tool(query: str, username: Optional[str] = None) -> str:
     """
@@ -53,7 +49,6 @@ def read_file_tool(filepath: str) -> str:
 def write_file_tool(filepath: str, content: str) -> str:
     """Write to a file."""
     return write_file(filepath, content)
-
 
 @dataclass
 class AgentDeps:
@@ -83,149 +78,253 @@ class AgentResponse(BaseModel):
         description="Short disclaimer about data quality, limitations if applicable and urls of datasets used."
     )
 
-
-# Use a test model if API key is not present (for CI/build environment)
-# Pydantic AI uses `azure:<deployment-name>` for Azure OpenAI
-# First check openai, then azure openai
+# Setup OpenAI client
 if os.environ.get("OPENAI_API_KEY"):
     model_name_env = os.environ.get("OPENAI_MODEL_NAME", "gpt-5.2")
-    model_name = f'openai:{model_name_env}'
+    openai_client = AsyncOpenAI()
+    model_name = model_name_env
 elif os.environ.get("AZURE_OPENAI_API_KEY"):
     deployment_name = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.2")
-    model_name = f'azure:{deployment_name}'
+    api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-02-01")
+    endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
+    openai_client = AsyncAzureOpenAI(
+        azure_endpoint=endpoint,
+        api_version=api_version,
+    )
+    model_name = deployment_name
 else:
+    openai_client = None
     model_name = 'test'
 
-level = "medior"
 dataframes = {}
-# Define the agent
-agent = Agent(
-    model_name,
-    deps_type=AgentDeps,
-    output_type=AgentResponse,
-    system_prompt=dedent(f"""
-        You are an expert Python data scientist talking to a {level} user. Always make sure user questions are specific, ask for information if necessary.
-        Return a Pydantic object with fields:
-        - answer (keep it concise, don't invent anything, use only Context below).
-        - related (2 SHORT related questions)
-        - code (A complete, self-contained hardened Python script without comments which produces the requested analysis/visualization. The script must contain variables `rows_used` holding the number of analyzed rows, and `result` holding the final output)
-        - disclaimer (A short disclaimer about data quality, limitations if applicable and urls of datasets used - use only Context below)
-        Based on the user question and chat history.
+level = "medior"
 
-        ### Context
-        - You have access to {len(dataframes)} pre-loaded (geo)pandas (Geo)DataFrames.
-        - Access them via the dictionary: dataframes['/datasets/subdir/name.csv']. Non-geometry columns may contain missing values, the hardened code should handle this.
-        - All GeoDataFrames are in EPSG:4326 (WGS84). Never modify geometry CRS.
-        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, fo, gpd, dataframes, sklearn, xgb
+SYSTEM_PROMPT = dedent(f"""
+    You are an expert Python data scientist talking to a {level} user. Always make sure user questions are specific, ask for information if necessary.
+    Return a structured JSON output with fields:
+    - answer (keep it concise, don't invent anything, use only Context below).
+    - related (2 SHORT related questions)
+    - code (A complete, self-contained hardened Python script without comments which produces the requested analysis/visualization. The script must contain variables `rows_used` holding the number of analyzed rows, and `result` holding the final output)
+    - disclaimer (A short disclaimer about data quality, limitations if applicable and urls of datasets used - use only Context below)
+    Based on the user question and chat history.
+
+    ### Context
+    - You have access to {len(dataframes)} pre-loaded (geo)pandas (Geo)DataFrames.
+    - Access them via the dictionary: dataframes['/datasets/subdir/name.csv']. Non-geometry columns may contain missing values, the hardened code should handle this.
+    - All GeoDataFrames are in EPSG:4326 (WGS84). Never modify geometry CRS.
+    - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, fo, gpd, dataframes, sklearn, xgb
 
 
-        ### Directives for the `code` field
-        1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments.
-        2. Case-Insensitive Comparisons: When performing string comparisons (e.g., in filters or groupings), always convert text to lowercase.
-        3. When you group by year, you use ticks of 1 year in charts.
-        4. For Map Visualizations: Use folium (fo) for any geospatial visualizations. Ensure maps are clear and informative. Always use folium.GeoJson(geodataframe). Do not add fo.TileLayer and fo.LayerControl to the map as they are added externally.
-        5. Final Output: The result of your script MUST be assigned to a variable named `result`.
+    ### Directives for the `code` field
+    1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments.
+    2. Case-Insensitive Comparisons: When performing string comparisons (e.g., in filters or groupings), always convert text to lowercase.
+    3. When you group by year, you use ticks of 1 year in charts.
+    4. For Map Visualizations: Use folium (fo) for any geospatial visualizations. Ensure maps are clear and informative. Always use folium.GeoJson(geodataframe). Do not add fo.TileLayer and fo.LayerControl to the map as they are added externally.
+    5. Final Output: The result of your script MUST be assigned to a variable named `result`.
 
-        ### Output Requirements for `result` variable
-        1. Allowed Types:
-            - folium.Map
-            - plotly.graph_objects.Figure
-            - pandas.DataFrame
-            - {{'type': 'download', 'data': bytes, 'filename': str, 'mime': str, 'label': str}}
-            - str
-        2. Prioritize visualizing results as a folium.Map or plotly.graph_objects.Figure. If neither is possible, use a pandas.DataFrame or str, in that order.
-        3. Visualization Style:
-            - Folium: use a high-contrast color for geometry and light colors for the map. Zoomlevel should show all geometries.
-            - Plotly: default theme with clear titles and axis labels.
-        4. The `code` string must contain only raw Python code (with `result` variable), no surrounding backticks or markdown.
-        If no code is needed, set `code` to null and provide an explanation in `answer`.
-    """)
-)
+    ### Output Requirements for `result` variable
+    1. Allowed Types:
+        - folium.Map
+        - plotly.graph_objects.Figure
+        - pandas.DataFrame
+        - {{'type': 'download', 'data': bytes, 'filename': str, 'mime': str, 'label': str}}
+        - str
+    2. Prioritize visualizing results as a folium.Map or plotly.graph_objects.Figure. If neither is possible, use a pandas.DataFrame or str, in that order.
+    3. Visualization Style:
+        - Folium: use a high-contrast color for geometry and light colors for the map. Zoomlevel should show all geometries.
+        - Plotly: default theme with clear titles and axis labels.
+    4. The `code` string must contain only raw Python code (with `result` variable), no surrounding backticks or markdown.
+    If no code is needed, set `code` to null and provide an explanation in `answer`.
+""")
 
-# Register tools explicitly
-@agent.tool
-def data_query(ctx: RunContext[AgentDeps], query: str) -> str:
-    """
-    Run a SQL query on the data using DuckDB.
-    Use __PARQUET_DIR__ as a path to access the user's parquet files (e.g. read_parquet('__PARQUET_DIR__*.parquet')).
-    """
-    return run_data_query_tool(query, username=ctx.deps.user_soul.username)
+OPENAI_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "data_query",
+            "description": "Run a SQL query on the data using DuckDB. Use __PARQUET_DIR__ as a path to access the user's parquet files.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The SQL query to run"
+                    }
+                },
+                "required": ["query"],
+                "additionalProperties": False
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_file_content",
+            "description": "Read the content of a file.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filepath": {
+                        "type": "string",
+                        "description": "The path to the file"
+                    }
+                },
+                "required": ["filepath"],
+                "additionalProperties": False
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "write_file_content",
+            "description": "Write content to a file.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filepath": {
+                        "type": "string",
+                        "description": "The path to the file"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The content to write"
+                    }
+                },
+                "required": ["filepath", "content"],
+                "additionalProperties": False
+            }
+        }
+    }
+]
 
-@agent.tool
-def read_file_content(ctx: RunContext[AgentDeps], filepath: str) -> str:
-    """Read the content of a file."""
-    return read_file_tool(filepath)
-
-@agent.tool
-def write_file_content(ctx: RunContext[AgentDeps], filepath: str, content: str) -> str:
-    """Write content to a file."""
-    return write_file_tool(filepath, content)
-
-
-@agent.system_prompt
-def add_soul_context(ctx: RunContext[AgentDeps]) -> str:
-    soul = ctx.deps.user_soul
+def add_soul_context(soul: Soul) -> str:
     return f"User Preferences: {soul.preferences}. Communication Style: {soul.style}."
 
+async def execute_tool(tool_call, deps: AgentDeps, mcp_session: Optional[ClientSession] = None, mcp_name_mapping: Optional[dict] = None) -> str:
+    name = tool_call.function.name
+    try:
+        args = json.loads(tool_call.function.arguments)
+    except json.JSONDecodeError:
+        return "Error: Invalid JSON arguments provided."
 
-from pydantic_ai.toolsets import FunctionToolset
+    if name == "data_query":
+        return await asyncio.to_thread(run_data_query_tool, args.get("query", ""), username=deps.user_soul.username)
+    elif name == "read_file_content":
+        return await asyncio.to_thread(read_file_tool, args.get("filepath", ""))
+    elif name == "write_file_content":
+        return await asyncio.to_thread(write_file_tool, args.get("filepath", ""), args.get("content", ""))
+    elif mcp_session and mcp_name_mapping and name in mcp_name_mapping:
+        original_name = mcp_name_mapping[name]
+        try:
+            result = await mcp_session.call_tool(original_name, args)
+            return str(result.content)
+        except Exception as e:
+            return f"Error executing MCP tool {original_name}: {str(e)}"
 
-def _create_mcp_toolset(mcp_session: ClientSession, tools_list: list) -> FunctionToolset:
-    toolset = FunctionToolset()
-    for mcp_tool in tools_list:
-        async def make_wrapper(name: str):
-            async def mcp_tool_wrapper(ctx: RunContext[AgentDeps], **kwargs) -> str:
-                result = await mcp_session.call_tool(name, kwargs)
-                return str(result.content)
-            return mcp_tool_wrapper
+    return f"Error: Tool {name} not found."
 
-        wrapper = asyncio.run(make_wrapper(mcp_tool.name))
-        wrapper.__name__ = mcp_tool.name.replace('-', '_') # Ensure valid python function name
-        wrapper.__doc__ = mcp_tool.description or ""
-        toolset.tool(wrapper)
-    return toolset
+def convert_mcp_tools_to_openai(mcp_tools: list) -> tuple[list, dict]:
+    openai_mcp_tools = []
+    name_mapping = {}
+    for tool in mcp_tools:
+        # Provide a basic wrapper around MCP tool parameters
+        # MCP tool parameters schema is usually JSON Schema already
+        props = getattr(tool, "inputSchema", {}) or getattr(tool, "input_schema", {})
+        safe_name = tool.name.replace('-', '_')
+        name_mapping[safe_name] = tool.name
 
+        openai_mcp_tools.append({
+            "type": "function",
+            "function": {
+                "name": safe_name,
+                "description": tool.description or "",
+                "parameters": props if props else {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": True
+                }
+            }
+        })
+    return openai_mcp_tools, name_mapping
 
-async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: List[ModelMessage], toolsets: list) -> AgentResponse:
-    # Helper to connect to MCP and run the agent
+async def _run_agent_loop(query: str, deps: AgentDeps, messages: list, mcp_session: Optional[ClientSession] = None) -> AgentResponse:
+    if model_name == 'test' or openai_client is None:
+        return AgentResponse(
+            answer="This is a test answer from the mock agent.",
+            related=["Test related 1?", "Test related 2?"],
+            code="result = 'test result'",
+            disclaimer="Test disclaimer"
+        )
+
+    tools = list(OPENAI_TOOLS)
+    mcp_name_mapping = {}
+    if mcp_session:
+        mcp_tools_list = await mcp_session.list_tools()
+        mcp_tools_openai, mcp_name_mapping = convert_mcp_tools_to_openai(mcp_tools_list.tools)
+        tools.extend(mcp_tools_openai)
+
+    max_iterations = 10
+    for _ in range(max_iterations):
+        logger.info(f"Calling OpenAI with {len(messages)} messages...")
+
+        response = await openai_client.beta.chat.completions.parse(
+            model=model_name,
+            messages=messages,
+            tools=tools if tools else None,
+            response_format=AgentResponse,
+        )
+
+        choice = response.choices[0]
+
+        if choice.finish_reason == "tool_calls":
+            message_to_append = {
+                "role": "assistant",
+                "content": choice.message.content,
+                "tool_calls": choice.message.tool_calls
+            }
+            messages.append(message_to_append)
+
+            for tool_call in choice.message.tool_calls:
+                logger.info(f"Executing tool {tool_call.function.name} with args {tool_call.function.arguments}")
+                tool_result = await execute_tool(tool_call, deps, mcp_session, mcp_name_mapping)
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": tool_result
+                })
+        else:
+            if choice.message.parsed:
+                return choice.message.parsed
+            else:
+                # If for some reason parsed is None, try parsing the content directly
+                try:
+                    return AgentResponse.model_validate_json(choice.message.content)
+                except Exception as e:
+                    logger.error(f"Failed to parse response: {e}")
+                    raise Exception(f"Failed to parse model response: {choice.message.content}")
+
+    raise Exception("Max iterations reached for agent tool execution loop.")
+
+async def _connect_mcp_and_run(query: str, deps: AgentDeps, messages: list) -> AgentResponse:
     if deps.mcp_url and deps.mcp_type == 'SSE':
         async with sse_client(deps.mcp_url) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as mcp_session:
                 await mcp_session.initialize()
-
-                # Dynamic tools from MCP
-                tools = await mcp_session.list_tools()
-
-                mcp_toolset = _create_mcp_toolset(mcp_session, tools.tools)
-                run_toolsets = toolsets + [mcp_toolset]
-
-                result = await agent.run(query, deps=deps, message_history=message_history, toolsets=run_toolsets)
-                return result.output
+                return await _run_agent_loop(query, deps, messages, mcp_session)
 
     elif deps.mcp_url and deps.mcp_type == 'STDIO':
-        # Assuming URL is the command for STDIO
         cmd_parts = deps.mcp_url.split()
         if not cmd_parts:
-            # Fallback if command is empty
-            result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets)
-            return result.output
+            return await _run_agent_loop(query, deps, messages)
 
         server_params = StdioServerParameters(command=cmd_parts[0], args=cmd_parts[1:])
         async with stdio_client(server_params) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as mcp_session:
                 await mcp_session.initialize()
-                tools = await mcp_session.list_tools()
-
-                mcp_toolset = _create_mcp_toolset(mcp_session, tools.tools)
-                run_toolsets = toolsets + [mcp_toolset]
-
-                result = await agent.run(query, deps=deps, message_history=message_history, toolsets=run_toolsets)
-                return result.output
+                return await _run_agent_loop(query, deps, messages, mcp_session)
     else:
-        logger.info(query)
-        result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets)
-        logger.info(result)
-        return result.output
+        return await _run_agent_loop(query, deps, messages)
 
 def get_result(exec_globals, allowed_globals):
     result = copy.deepcopy(exec_globals["result"]) if "result" in exec_globals else None
@@ -242,64 +341,38 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     Includes memory/chat history.
     """
 
-    toolsets = []
-    tmp_dir = None
-
     logger.debug(deps)
 
-    # Load skill file if provided
+    # Note: Skills via .zip files and pydantic-ai-skills are not supported in this native OpenAI refactor yet.
     if deps.skill_file:
-        tmp_dir = tempfile.mkdtemp()
-        zip_path = os.path.join(tmp_dir, "skills.zip")
-        with open(zip_path, "wb") as f:
-            f.write(await deps.skill_file.read())
+        logger.warning("Skills are currently not supported. Ignoring skill file.")
 
-        try:
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(tmp_dir)
-
-            # Use pydantic-ai-skills to load from directory
-            skills_dir = SkillsDirectory(tmp_dir)
-            skill_toolset = SkillsToolset(skills_dir)
-            toolsets.append(skill_toolset)
-        except Exception as e:
-            print(f"Failed to load skills: {e}")
-
-    # Load chat history
-    # Pydantic AI uses a list of messages. We need to convert our DB history to Pydantic AI messages.
-    # Note: Pydantic AI expects specific message types.
-
-    # Fetch recent history (e.g. last 10 messages) to keep context manageable
+    # Fetch recent history
     statement = select(ChatHistory).where(ChatHistory.user_id == deps.user_id).order_by(ChatHistory.timestamp.desc()).limit(10)
     history_records = deps.db_session.exec(statement).all()
 
-    # Reverse to chronological order (oldest first)
-    # The result of all() on a slice/limit query might be a list, we reverse it.
+    # Reverse to chronological order
     history_records: List[ChatHistory] = list(history_records)
     history_records.reverse()
 
-    message_history: List[ModelMessage] = []
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT + "\n\n" + add_soul_context(deps.user_soul)}
+    ]
 
     for record in history_records:
-        if record.role == "user":
-            message_history.append(ModelRequest(parts=[UserPromptPart(content=record.content)]))
-        elif record.role == "model":
-            # For simplicity, we assume model response is text.
-            # In a full system we'd parse tool calls if we stored them.
-            message_history.append(ModelResponse(parts=[TextPart(content=record.content)]))
+        if record.role in ["user", "model", "assistant"]:
+            role = "assistant" if record.role == "model" else record.role
+            messages.append({"role": role, "content": record.content})
 
-    # Run the agent with history and toolsets
+    messages.append({"role": "user", "content": query})
+
+    # Run the agent with history and tools
     try:
-        agent_response = await _connect_mcp_and_run(query, deps, message_history, toolsets)
+        agent_response = await _connect_mcp_and_run(query, deps, messages)
         print(agent_response)
     except Exception as e:
         logger.error(f"Error executing agent in run_agent: {e}", exc_info=True)
-        if tmp_dir:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
         raise e
-
-    if tmp_dir:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
 
     # Execute the generated Python code
     exec_globals = { "np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl }
@@ -333,10 +406,9 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
         exec_result = {"type": "error", "content": f"Execution error: {str(e)}"}
 
     logger.debug(exec_result)
-    # Determine model string for metadata
+
     model_name_str = str(model_name)
 
-    # Store the result (ResearchStep)
     step = ResearchStep(
         user_id=deps.user_id,
         query=query,
