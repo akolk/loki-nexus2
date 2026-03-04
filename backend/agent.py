@@ -126,15 +126,16 @@ agent = Agent(
 
         ### Output Requirements for `result` variable
         1. Allowed Types:
-            - dict geo featureCollection 
+            - dict geo featureCollection
+            - geopandas.GeoDataFrame
             - plotly.graph_objects.Figure
             - pandas.DataFrame
+            - polars.DataFrame
             - {{'type': 'download', 'data': bytes, 'filename': str, 'mime': str, 'label': str}}
             - str
-        2. Prioritize visualizing results as a geofeatures or plotly.graph_objects.Figure. If neither is possible, use a pandas.DataFrame or str, in that order.
-        3. Visualization Style:
+        2. Visualization Style:
             - Plotly: default theme with clear titles and axis labels.
-        4. The `code` string must contain only raw Python code (with `result` variable), no surrounding backticks or markdown.
+        3. The `code` string must contain only raw Python code (with `result` variable), no surrounding backticks or markdown.
         If no code is needed, set `code` to null and provide an explanation in `answer`.
     """)
 )
