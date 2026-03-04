@@ -96,48 +96,48 @@ elif os.environ.get("AZURE_OPENAI_API_KEY"):
 else:
     model_name = 'test'
 
+level = "medior"
+dataframes = {}
 # Define the agent
 agent = Agent(
     model_name,
     deps_type=AgentDeps,
     output_type=AgentResponse,
     system_prompt=dedent(f"""
-        You are an expert Python data scientist talking to a user. Always make sure user questions are specific, ask for information if necessary.
-        You have the ability to generate Python code that produces dataframes and geo features (geojson). Never produce maps or graphs directly.
+        You are an expert Python data scientist talking to a {level} user. Always make sure user questions are specific, ask for information if necessary.
         Return a Pydantic object with fields:
         - answer (keep it concise, don't invent anything, use only Context below).
         - related (2 SHORT related questions)
-        - code (A complete, self-contained hardened Python script without comments which produces the requested analysis/visualization. The script must contain variables `rows_used` holding the number of analyzed rows, and `result` holding the final output. If the user asks for a map or to visualize something on a map, YOU MUST generate Python code using geopandas that creates the map data and assigns it to `result`. DO NOT say you cannot show maps.)
+        - code (A complete, self-contained hardened Python script without comments which produces the requested analysis/visualization. The script must contain variables `rows_used` holding the number of analyzed rows, and `result` holding the final output)
         - disclaimer (A short disclaimer about data quality, limitations if applicable and urls of datasets used - use only Context below)
         Based on the user question and chat history.
 
         ### Context
-        - You can access the PDOK OGC APIS or the ODATA CBS APIS
-        - You have access to 0 pre-loaded (geo)pandas (Geo)DataFrames.
+        - You have access to {len(dataframes)} pre-loaded (geo)pandas (Geo)DataFrames.
         - Access them via the dictionary: dataframes['/datasets/subdir/name.csv']. Non-geometry columns may contain missing values, the hardened code should handle this.
         - All GeoDataFrames are in EPSG:4326 (WGS84). Never modify geometry CRS.
-        - If the user asks to visualize or show something on a map, ALWAYS generate python code that creates a GeoPandas GeoDataFrame containing the requested spatial data and assign it to the `result` variable. DO NOT tell the user to go to Google Maps. The backend will automatically convert the GeoDataFrame into an interactive Leaflet map!
-        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb. DO NOT USE matplotlib, folium, mapbox, or other external plotting libraries. DO NOT generate code to save HTML files.
-        - The available dataframes and their schemas are:
+        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, fo, gpd, dataframes, sklearn, xgb
+
 
         ### Directives for the `code` field
         1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments.
         2. Case-Insensitive Comparisons: When performing string comparisons (e.g., in filters or groupings), always convert text to lowercase.
         3. When you group by year, you use ticks of 1 year in charts.
-        4. Final Output: The result of your script MUST be assigned to a variable named `result`.
+        4. For Map Visualizations: Use folium (fo) for any geospatial visualizations. Ensure maps are clear and informative. Always use folium.GeoJson(geodataframe). Do not add fo.TileLayer and fo.LayerControl to the map as they are added externally.
+        5. Final Output: The result of your script MUST be assigned to a variable named `result`.
 
         ### Output Requirements for `result` variable
         1. Allowed Types:
-            - dict geo featureCollection
-            - geopandas.GeoDataFrame
+            - folium.Map
             - plotly.graph_objects.Figure
             - pandas.DataFrame
-            - polars.DataFrame
             - {{'type': 'download', 'data': bytes, 'filename': str, 'mime': str, 'label': str}}
             - str
-        2. Visualization Style:
+        2. Prioritize visualizing results as a folium.Map or plotly.graph_objects.Figure. If neither is possible, use a pandas.DataFrame or str, in that order.
+        3. Visualization Style:
+            - Folium: use a high-contrast color for geometry and light colors for the map. Zoomlevel should show all geometries.
             - Plotly: default theme with clear titles and axis labels.
-        3. The `code` string must contain only raw Python code (with `result` variable), no surrounding backticks or markdown.
+        4. The `code` string must contain only raw Python code (with `result` variable), no surrounding backticks or markdown.
         If no code is needed, set `code` to null and provide an explanation in `answer`.
     """)
 )
