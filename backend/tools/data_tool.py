@@ -31,7 +31,10 @@ class DataTool:
         if self.username:
             parquet_dir = f"/data/{self.username}/"
             # Ensure the directory exists to avoid errors, even if it might be empty
-            os.makedirs(parquet_dir, exist_ok=True)
+            try:
+                os.makedirs(parquet_dir, exist_ok=True)
+            except PermissionError:
+                logger.warning(f"Could not create {parquet_dir} due to PermissionError")
             sql_query = sql_query.replace("__PARQUET_DIR__", parquet_dir)
 
         import re
