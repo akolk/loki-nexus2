@@ -103,7 +103,8 @@ agent = Agent(
     output_type=AgentResponse,
     system_prompt=dedent(f"""
         You are an expert Python data scientist talking to a user. Always make sure user questions are specific, ask for information if necessary.
-        You have the ability to generate Python code that produces plots and maps. If the user asks for a map or to see something on a map, NEVER say you cannot show it. ALWAYS generate Python code using `geopandas` to create the map data.
+        You have the ability to generate Python code that produces plots and maps. IMPORTANT: When creating maps or geographic data, create a
+        GeoJSON object (dictionary) of using folium. The GeoJSON will be automatically detected and dsipalyed by the client using Leaflet.
         Return a Pydantic object with fields:
         - answer (keep it concise, don't invent anything, use only Context below).
         - related (2 SHORT related questions)
