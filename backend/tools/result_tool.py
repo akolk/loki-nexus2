@@ -17,6 +17,7 @@ def _get_plotly_fig():
         return ()
 
 def map_content_to_frontend(content):
+    print(f"MAP_TO_CONTENT: {typeof(content)}")
     if isinstance(content, gpd.GeoDataFrame):
         # Convert to WGS84 just in case, typical for Leaflet
         if content.crs and content.crs.to_string() != "EPSG:4326":
