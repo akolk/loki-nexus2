@@ -19,6 +19,7 @@ from sqlmodel import Session, select
 from textwrap import dedent
 import os
 import tempfile
+import copy
 import zipfile
 import shutil
 import asyncio
@@ -225,9 +226,6 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
 
 def get_result(exec_globals, allowed_globals):
     result = copy.deepcopy(exec_globals["result"]) if "result" in exec_globals else None
-    if "rows_used" in exec_globals:
-        rows_used = (exec_globals["rows_used"] or 0)
-        st.session_state.rows_used += rows_used if isinstance(rows_used, int) else 0
 
     for key in list(exec_globals.keys()):
         if key not in allowed_globals and not key.startswith("__"):
@@ -308,7 +306,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     try:
         if agent_response.code:
             print(agent_response.code)
-            exec(agent_response.code, env)
+            exec(agent_response.code, exec_globals)
 
             result = get_result(exec_globals, allowed_globals)
             
