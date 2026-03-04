@@ -289,6 +289,72 @@ function createPostit(execResult) {
         resDiv.appendChild(img);
     } else if (execResult.type === "html") {
         resDiv.innerHTML = execResult.content;
+    } else if (execResult.type === "geojson_map" || execResult.type === "FeatureCollection") {
+        // Create a local map container
+        const mapDivId = `map-${Math.random().toString(36).substr(2, 9)}`;
+        const mapContainer = document.createElement("div");
+        mapContainer.id = mapDivId;
+        mapContainer.style.width = '100%';
+        mapContainer.style.height = '100%';
+        resDiv.appendChild(mapContainer);
+        resDiv.style.width = '100%';
+        resDiv.style.height = '100%';
+
+        // Wait for DOM to attach so map size is correct
+        setTimeout(() => {
+            const localMap = L.map(mapDivId).setView([52.155, 5.387], 8);
+
+            const pdokUrl = 'https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png';
+            L.tileLayer(pdokUrl, {
+                attribution: 'Kaartgegevens &copy; <a href="https://www.pdok.nl">PDOK</a>',
+                minZoom: 6,
+                maxZoom: 19
+            }).addTo(localMap);
+
+            let featuresData = execResult.type === "FeatureCollection" ? execResult.features : execResult.content.features;
+            if (featuresData && featuresData.length > 0) {
+                const geoJsonLayer = L.geoJSON(featuresData, {
+                    onEachFeature: function (feature, layer) {
+                        if (feature.properties) {
+                            let popupContent = '<div style="max-height: 200px; overflow-y: auto;">';
+                            popupContent += '<table class="table table-sm table-striped" style="margin-bottom:0;"><tbody>';
+                            for (let key in feature.properties) {
+                                let val = feature.properties[key];
+                                if (val !== null && val !== undefined) {
+                                    popupContent += `<tr><th>${key}</th><td>${val}</td></tr>`;
+                                }
+                            }
+                            popupContent += '</tbody></table></div>';
+                            layer.bindPopup(popupContent);
+                        }
+                    }
+                }).addTo(localMap);
+
+                if (geoJsonLayer.getBounds().isValid()) {
+                    localMap.fitBounds(geoJsonLayer.getBounds());
+                }
+            }
+
+            let tileServersData = execResult.type === "FeatureCollection" ? [] : (execResult.content.tile_servers || []);
+            if (tileServersData && tileServersData.length > 0) {
+                tileServersData.forEach(ts => {
+                    L.tileLayer(ts.url, {
+                        attribution: ts.attribution || '',
+                        minZoom: ts.minZoom || 0,
+                        maxZoom: ts.maxZoom || 19
+                    }).addTo(localMap);
+                });
+            }
+
+            // Setup resize observer for dynamic resizing (e.g., maximize/restore)
+            const ro = new ResizeObserver(() => {
+                localMap.invalidateSize();
+            });
+            ro.observe(resDiv);
+
+            // Add initial invalidateSize just in case
+            setTimeout(() => { localMap.invalidateSize(); }, 200);
+        }, 100);
     } else if (execResult.type === "plotly") {
         try {
             const plotData = typeof execResult.content === 'string' ? JSON.parse(execResult.content) : execResult.content;
@@ -388,7 +454,7 @@ function appendMessage(role, content, execResult=null, related=[]) {
     msgDiv.innerHTML = `<strong>${role}:</strong> <br>${formattedContent}`;
 
     if (execResult) {
-        if (!isMapMode && execResult.type !== "geojson_map" && execResult.type !== "FeatureCollection") {
+        if (!isMapMode || (execResult.type !== "geojson_map" && execResult.type !== "FeatureCollection")) {
             createPostit(execResult);
         } else {
             const resDiv = document.createElement("div");
