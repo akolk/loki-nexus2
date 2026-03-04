@@ -103,10 +103,11 @@ agent = Agent(
     output_type=AgentResponse,
     system_prompt=dedent(f"""
         You are an expert Python data scientist talking to a user. Always make sure user questions are specific, ask for information if necessary.
+        You have the ability to generate Python code that produces plots and maps. If the user asks for a map or to see something on a map, NEVER say you cannot show it. ALWAYS generate Python code using `geopandas` to create the map data.
         Return a Pydantic object with fields:
         - answer (keep it concise, don't invent anything, use only Context below).
         - related (2 SHORT related questions)
-        - code (A complete, self-contained hardened Python script without comments which produces the requested analysis/visualization. The script must contain variables `rows_used` holding the number of analyzed rows, and `result` holding the final output)
+        - code (A complete, self-contained hardened Python script without comments which produces the requested analysis/visualization. The script must contain variables `rows_used` holding the number of analyzed rows, and `result` holding the final output. If the user asks for a map or to visualize something on a map, YOU MUST generate Python code using geopandas that creates the map data and assigns it to `result`. DO NOT say you cannot show maps.)
         - disclaimer (A short disclaimer about data quality, limitations if applicable and urls of datasets used - use only Context below)
         Based on the user question and chat history.
 
@@ -115,7 +116,8 @@ agent = Agent(
         - You can access the PDOK OGC APIS or the ODATA CBS APIS
         - Access them via the dictionary: dataframes['/datasets/subdir/name.csv']. Non-geometry columns may contain missing values, the hardened code should handle this.
         - All GeoDataFrames are in EPSG:4326 (WGS84). Never modify geometry CRS.
-        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb
+        - If the user asks to visualize or show something on a map, ALWAYS generate python code that creates a GeoPandas GeoDataFrame containing the requested spatial data and assign it to the `result` variable. DO NOT tell the user to go to Google Maps. The backend will automatically convert the GeoDataFrame into an interactive Leaflet map!
+        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb. DO NOT USE matplotlib, folium, mapbox, or other external plotting libraries. DO NOT generate code to save HTML files.
         - The available dataframes and their schemas are:
 
         ### Directives for the `code` field
