@@ -112,8 +112,8 @@ agent = Agent(
         Based on the user question and chat history.
 
         ### Context
-        - You have access to 0 pre-loaded (geo)pandas (Geo)DataFrames.
         - You can access the PDOK OGC APIS or the ODATA CBS APIS
+        - You have access to 0 pre-loaded (geo)pandas (Geo)DataFrames.
         - Access them via the dictionary: dataframes['/datasets/subdir/name.csv']. Non-geometry columns may contain missing values, the hardened code should handle this.
         - All GeoDataFrames are in EPSG:4326 (WGS84). Never modify geometry CRS.
         - If the user asks to visualize or show something on a map, ALWAYS generate python code that creates a GeoPandas GeoDataFrame containing the requested spatial data and assign it to the `result` variable. DO NOT tell the user to go to Google Maps. The backend will automatically convert the GeoDataFrame into an interactive Leaflet map!
