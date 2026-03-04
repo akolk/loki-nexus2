@@ -310,6 +310,18 @@
             min-height: 200px;
             z-index: 5;
             cursor: move;
+            transition: min-height 0.3s ease, min-width 0.3s ease;
+        }
+
+        .postit-group.collapsed {
+            min-width: auto;
+            min-height: auto;
+            border-style: solid;
+            background: rgba(0,0,0,0.1);
+        }
+
+        .postit-group.collapsed .postit-group-content {
+            display: none;
         }
 
         .postit-group-header {
