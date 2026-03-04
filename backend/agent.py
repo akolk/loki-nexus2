@@ -308,7 +308,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     try:
         if agent_response.code:
             print(agent_response.code)
-            exec(agent_response.code, env)
+            exec(agent_response.code, exec_globals)
 
             result = get_result(exec_globals, allowed_globals)
             
