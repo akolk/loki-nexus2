@@ -116,7 +116,7 @@ metadata_part = ""
 for api in ogc_apis:
     ogc_info += f"         - {api['url']} : {api['title']}\n"
 for api in cbs_apis:
-    cbs_info += f"         - {api['url']} : {api['title']}\n"
+    cbs_info += f"         - {api['url']} : {api['displaytitle']}\n"
 for api in wfs_apis:
     wfs_info += f"         - {api['url']} : {api['displaytitle']}\n"
     
