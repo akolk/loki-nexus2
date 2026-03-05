@@ -102,7 +102,7 @@ level = "medior"
 dataframes = {}
 
 dfs_info, ogc_info, cbs_info = "", "", ""
-sfs_api = {}
+wfs_api = {}
 
 for name, df in dataframes.items():
     col_info = ", ".join([f"`{col}` ({dtype})" for col, dtype in df.dtypes.items()])
