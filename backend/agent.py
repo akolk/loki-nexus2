@@ -108,8 +108,10 @@ for name, df in dataframes.items():
     col_info = ", ".join([f"`{col}` ({dtype})" for col, dtype in df.dtypes.items()])
     dfs_info += f"- {name}: {df.shape[0]} rows, {df.shape[1]} columns\n  - Columns: {col_info}\n"
 
-metadata = get_relevant_metadata(list(dataframes.keys()))
-metadata_part = f"\nWith metadata:\n  {json.dumps(metadata)}" if metadata else ""
+#metadata = get_relevant_metadata(list(dataframes.keys()))
+#metadata_part = f"\nWith metadata:\n  {json.dumps(metadata)}" if metadata else ""
+metadata_part = ""
+
 
 for api in ogc_apis:
     ogc_info += f"         - {api['url']} : {api['title']}\n"
