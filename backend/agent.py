@@ -15,6 +15,8 @@ from backend.models import Soul, ResearchStep, ChatHistory
 from backend.tools.data_tool import DataTool
 from backend.tools.file_tool import read_file, write_file
 from backend.tools.result_tool import map_content_to_frontend
+from backend.tools.ogc_apis import ogc_apis
+from backend.tools.cbs_apis import cbs_apis
 from sqlmodel import Session, select
 from textwrap import dedent
 import os
@@ -98,12 +100,25 @@ else:
 
 level = "medior"
 dataframes = {}
-# Define the agent
-agent = Agent(
-    model_name,
-    deps_type=AgentDeps,
-    output_type=AgentResponse,
-    system_prompt=dedent(f"""
+
+dfs_info, ogc_info, cbs_info = "", "", ""
+sfs_api = {}
+
+for name, df in dataframes.items():
+    col_info = ", ".join([f"`{col}` ({dtype})" for col, dtype in df.dtypes.items()])
+    dfs_info += f"- {name}: {df.shape[0]} rows, {df.shape[1]} columns\n  - Columns: {col_info}\n"
+
+metadata = get_relevant_metadata(list(dataframes.keys()))
+metadata_part = f"\nWith metadata:\n  {json.dumps(metadata)}" if metadata else ""
+
+for api in ogc_apis:
+    ogc_info += f"         - {api['url']} : {api['title']}\n"
+for api in cbs_apis:
+    cbs_info += f"         - {api['url']} : {api['title']}\n"
+for api in wfs_apis:
+    wfs_info += f"         - {api['url']} : {api['displaytitle']}\n"
+    
+system_prompt=dedent(f"""
         You are an expert Python data scientist talking to a {level} user. Always make sure user questions are specific, ask for information if necessary.
         Return a Pydantic object with fields:
         - answer (keep it concise, don't invent anything, use only Context below).
@@ -117,7 +132,11 @@ agent = Agent(
         - Access them via the dictionary: dataframes['/datasets/subdir/name.csv']. Non-geometry columns may contain missing values, the hardened code should handle this.
         - All GeoDataFrames are in EPSG:4326 (WGS84). Never modify geometry CRS.
         - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, fo, gpd, dataframes, sklearn, xgb
-
+        - The available dataframes and their schemas are:
+        {dfs_info}{metadata_part}
+        {f"- Available OGC APIs are (bbox filter only and use link-based pagination (999)): {ogc_info}" if ogc_info else ""}
+        {f"- Available CBS APIs are (use appropriate RegioS filters and pagination (9999)): {cbs_info}" if cbs_info else ""}
+        {f"- Available WFS APIs are: {wfs_info}" if wfs_info else ""}
 
         ### Directives for the `code` field
         1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments.
@@ -140,6 +159,15 @@ agent = Agent(
         4. The `code` string must contain only raw Python code (with `result` variable), no surrounding backticks or markdown.
         If no code is needed, set `code` to null and provide an explanation in `answer`.
     """)
+
+print(f"prompt={system_prompt}")
+
+# Define the agent
+agent = Agent(
+    model_name,
+    deps_type=AgentDeps,
+    output_type=AgentResponse,
+    system_prompt=system_prompt
 )
 
 # Register tools explicitly
@@ -166,7 +194,6 @@ def write_file_content(ctx: RunContext[AgentDeps], filepath: str, content: str) 
 def add_soul_context(ctx: RunContext[AgentDeps]) -> str:
     soul = ctx.deps.user_soul
     return f"User Preferences: {soul.preferences}. Communication Style: {soul.style}."
-
 
 from pydantic_ai.toolsets import FunctionToolset
 
