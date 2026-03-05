@@ -15,8 +15,8 @@ from backend.models import Soul, ResearchStep, ChatHistory
 from backend.tools.data_tool import DataTool
 from backend.tools.file_tool import read_file, write_file
 from backend.tools.result_tool import map_content_to_frontend
-from backend.tools.ogc_apis import ogc_apis
-from backend.tools.cbs_apis import cbs_apis
+from backend.tools.ogc_api import ogc_apis
+from backend.tools.cbs_api import cbs_apis
 from sqlmodel import Session, select
 from textwrap import dedent
 import os
