@@ -29,7 +29,6 @@ from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.client.sse import sse_client
 from mcp.client.session import ClientSession
 from mcp.shared.exceptions import McpError
-from pydantic_ai_skills import SkillsToolset, SkillsDirectory
 import logging
 
 logger = logging.getLogger(__name__)
@@ -116,26 +115,25 @@ agent = Agent(
         - You have access to {len(dataframes)} pre-loaded (geo)pandas (Geo)DataFrames.
         - Access them via the dictionary: dataframes['/datasets/subdir/name.csv']. Non-geometry columns may contain missing values, the hardened code should handle this.
         - All GeoDataFrames are in EPSG:4326 (WGS84). Never modify geometry CRS.
-        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, fo, gpd, dataframes, sklearn, xgb
+        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb. DO NOT USE matplotlib, folium, mapbox, or other external libraries.
 
 
         ### Directives for the `code` field
         1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments.
         2. Case-Insensitive Comparisons: When performing string comparisons (e.g., in filters or groupings), always convert text to lowercase.
         3. When you group by year, you use ticks of 1 year in charts.
-        4. For Map Visualizations: Use folium (fo) for any geospatial visualizations. Ensure maps are clear and informative. Always use folium.GeoJson(geodataframe). Do not add fo.TileLayer and fo.LayerControl to the map as they are added externally.
+        4. For Map Visualizations: Ensure maps are clear and informative.
         5. Final Output: The result of your script MUST be assigned to a variable named `result`.
 
         ### Output Requirements for `result` variable
         1. Allowed Types:
-            - folium.Map
+            - geopandas.GeoDataFrame
             - plotly.graph_objects.Figure
             - pandas.DataFrame
             - {{'type': 'download', 'data': bytes, 'filename': str, 'mime': str, 'label': str}}
             - str
-        2. Prioritize visualizing results as a folium.Map or plotly.graph_objects.Figure. If neither is possible, use a pandas.DataFrame or str, in that order.
+        2. Prioritize visualizing results as a geopandas.GeoDataFrame or plotly.graph_objects.Figure. If neither is possible, use a pandas.DataFrame or str, in that order.
         3. Visualization Style:
-            - Folium: use a high-contrast color for geometry and light colors for the map. Zoomlevel should show all geometries.
             - Plotly: default theme with clear titles and axis labels.
         4. The `code` string must contain only raw Python code (with `result` variable), no surrounding backticks or markdown.
         If no code is needed, set `code` to null and provide an explanation in `answer`.
@@ -227,8 +225,13 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
         logger.info(result)
         return result.output
 
-def get_result(exec_globals, allowed_globals):
-    result = copy.deepcopy(exec_globals["result"]) if "result" in exec_globals else None
+def get_result(exec_globals, allowed_globals, exec_locals):
+    if "result" in exec_locals:
+        result = copy.deepcopy(exec_locals["result"])
+    elif "result" in exec_globals:
+        result = copy.deepcopy(exec_globals["result"])
+    else:
+        result = None
 
     for key in list(exec_globals.keys()):
         if key not in allowed_globals and not key.startswith("__"):
@@ -249,21 +252,8 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
 
     # Load skill file if provided
     if deps.skill_file:
-        tmp_dir = tempfile.mkdtemp()
-        zip_path = os.path.join(tmp_dir, "skills.zip")
-        with open(zip_path, "wb") as f:
-            f.write(await deps.skill_file.read())
-
-        try:
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(tmp_dir)
-
-            # Use pydantic-ai-skills to load from directory
-            skills_dir = SkillsDirectory(tmp_dir)
-            skill_toolset = SkillsToolset(skills_dir)
-            toolsets.append(skill_toolset)
-        except Exception as e:
-            print(f"Failed to load skills: {e}")
+        # Support for pydantic-ai-skills has been removed per memory instructions.
+        logger.warning("Local .zip skills are no longer supported. Please use MCP servers.")
 
     # Load chat history
     # Pydantic AI uses a list of messages. We need to convert our DB history to Pydantic AI messages.
@@ -309,9 +299,11 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     try:
         if agent_response.code:
             print(agent_response.code)
-            exec(agent_response.code, exec_globals)
+            # Remove any undefined env reference inside exec, use empty local env.
+            exec_locals = {}
+            exec(agent_response.code, exec_globals, exec_locals)
 
-            result = get_result(exec_globals, allowed_globals)
+            result = get_result(exec_globals, allowed_globals, exec_locals)
             
             if result is not None:
                 exec_result = map_content_to_frontend(result)

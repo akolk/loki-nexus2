@@ -162,15 +162,11 @@ async def chat_endpoint(
 
 @app.get("/history")
 def get_history(
-    x_forwarded_user: str = Header("unknown_user", alias="x-forwarded-user"),
+    user_data: Tuple[User, Soul] = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     try:
-        statement = select(User).where(User.username == x_forwarded_user)
-        user = session.exec(statement).first()
-
-        if not user:
-            return []
+        user, _ = user_data
 
         statement = select(ChatHistory).where(ChatHistory.user_id == user.id).order_by(ChatHistory.timestamp)
         history = session.exec(statement).all()
@@ -201,15 +197,11 @@ def delete_history(
 @app.post("/jobs")
 def schedule_job(
     job: JobRequest,
-    x_forwarded_user: str = Header("unknown_user", alias="x-forwarded-user"),
+    user_data: Tuple[User, Soul] = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     try:
-        statement = select(User).where(User.username == x_forwarded_user)
-        user = session.exec(statement).first()
-
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found (interact with chat first)")
+        user, _ = user_data
 
         add_job(user.id, job.query, job.interval_seconds)
         return {"status": "Job scheduled"}
