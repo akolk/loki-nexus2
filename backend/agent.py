@@ -25,6 +25,7 @@ import copy
 import zipfile
 import shutil
 import asyncio
+import json
 
 from fastapi import UploadFile
 from mcp.client.stdio import stdio_client, StdioServerParameters
@@ -136,8 +137,8 @@ system_prompt=dedent(f"""
         - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, fo, gpd, dataframes, sklearn, xgb
         - The available dataframes and their schemas are:
         {dfs_info}{metadata_part}
-        {f"- Available OGC APIs are (bbox filter only and use link-based pagination (999)): {ogc_info}" if ogc_info else ""}
-        {f"- Available CBS APIs are (use appropriate RegioS filters and pagination (9999)): {cbs_info}" if cbs_info else ""}
+        {f"- Available OGC APIs are (bbox filter only and use link-based pagination (999)):\n {json.dumps(ogc_apis)}" if ogc_info else ""}
+        {f"- Available CBS APIs are (use appropriate RegioS filters and pagination (9999)):\n {json.dumps(cbs_apis)}" if cbs_info else ""}
         {f"- Available WFS APIs are: {wfs_info}" if wfs_info else ""}
 
         ### Directives for the `code` field
