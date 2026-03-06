@@ -310,6 +310,18 @@
             min-height: 200px;
             z-index: 5;
             cursor: move;
+            transition: min-height 0.3s ease, min-width 0.3s ease;
+        }
+
+        .postit-group.collapsed {
+            min-width: auto;
+            min-height: auto;
+            border-style: solid;
+            background: rgba(0,0,0,0.1);
+        }
+
+        .postit-group.collapsed .postit-group-content {
+            display: none;
         }
 
         .postit-group-header {
@@ -417,9 +429,11 @@
             <div class="chat-header">
                 <div style="display: flex; align-items: center;">
                     <div id="settings-toggle" onclick="toggleSettings()" onmouseover="openSettings()">&#9776;</div>
-                    <strong>Workspace Agent</strong>
+                    <strong id="chat-header-title">Workspace Agent</strong>
                 </div>
                 <div>
+                    <button style="border:none;background:none;cursor:pointer;font-size:16px;margin-right:5px;" onclick="clearUIHistory()" title="Clear Chat Window">🧹</button>
+                    <button style="border:none;background:none;cursor:pointer;font-size:16px;margin-right:10px;" onclick="clearDBHistory()" title="Clear DB History">🗑️</button>
                     <span style="cursor:pointer;" onclick="toggleChat()">&#x2715;</span>
                 </div>
             </div>

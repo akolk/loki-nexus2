@@ -1,6 +1,13 @@
 const username = "researcher_01";
 const historyDiv = document.getElementById("chat-history");
 const statusDiv = document.getElementById("status");
+const chatHeaderTitle = document.getElementById("chat-header-title");
+
+// Set the header title to "Hallo [username]"
+if (chatHeaderTitle) {
+    chatHeaderTitle.textContent = `Hallo ${username}`;
+}
+
 let isMapMode = false;
 let map = null;
 let currentGeoJsonLayer = null;
@@ -111,7 +118,11 @@ async function loadHistory() {
 
 // Helper to initialize drag-and-drop for post-its
 function makeDraggable(element, handle = element) {
-    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+    let initialX = 0, initialY = 0;
+    let currentX = 0, currentY = 0;
+    let xOffset = 0, yOffset = 0;
+    let isDragging = false;
+    let animationFrameId = null;
 
     handle.onmousedown = dragMouseDown;
 
@@ -119,13 +130,16 @@ function makeDraggable(element, handle = element) {
         // Prevent drag on buttons or inputs
         if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
 
-        e.preventDefault();
-        // get the mouse cursor position at startup:
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-
         // Prevent drag if maximized
         if (element.classList.contains('maximized')) return;
+
+        // If it has transition on transform, it might interfere with smooth dragging,
+        // but let's just make sure we capture initial correctly.
+
+        initialX = e.clientX - xOffset;
+        initialY = e.clientY - yOffset;
+
+        isDragging = true;
 
         // bring to front
         document.querySelectorAll('.postit-note, .postit-group').forEach(el => {
@@ -133,26 +147,74 @@ function makeDraggable(element, handle = element) {
         });
         if(!element.classList.contains('pinned') && !element.classList.contains('maximized')) element.style.zIndex = "100";
 
+        // Disable transitions on top/left/transform while dragging for immediate response
+        element.style.transition = 'none';
+
         document.onmouseup = closeDragElement;
         document.onmousemove = elementDrag;
     }
 
     function elementDrag(e) {
+        if (!isDragging) return;
         e.preventDefault();
-        // calculate the new cursor position:
-        pos1 = pos3 - e.clientX;
-        pos2 = pos4 - e.clientY;
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        // set the element's new position:
-        element.style.top = (element.offsetTop - pos2) + "px";
-        element.style.left = (element.offsetLeft - pos1) + "px";
+
+        currentX = e.clientX - initialX;
+        currentY = e.clientY - initialY;
+
+        xOffset = currentX;
+        yOffset = currentY;
+
+        if (!animationFrameId) {
+            animationFrameId = requestAnimationFrame(setTranslate);
+        }
+    }
+
+    function setTranslate() {
+        // Keep the existing rotation if it's a postit note
+        let transformStr = `translate(${currentX}px, ${currentY}px)`;
+        if (element.classList.contains('postit-note') && element.dataset.rotation) {
+            transformStr += ` rotate(${element.dataset.rotation}deg)`;
+        }
+        element.style.transform = transformStr;
+        animationFrameId = null;
     }
 
     function closeDragElement() {
+        if (!isDragging) return;
+        isDragging = false;
+
         // stop moving when mouse button is released:
         document.onmouseup = null;
         document.onmousemove = null;
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
+
+        // Commit transform to top/left to keep DOM consistent for collision detection
+        const rect = element.getBoundingClientRect();
+
+        // Reset offsets and transform
+        xOffset = 0;
+        yOffset = 0;
+
+        if (element.closest('.postit-group-content')) {
+            // If it's inside a group, we shouldn't commit the page-relative bounding rect
+            // directly to top/left since it's position: relative. Let's let the grouping logic handle it.
+            // Actually, if it's in a group, we just let it be handled or reset its transform if not detached.
+        } else {
+            element.style.left = rect.left + window.scrollX + "px";
+            element.style.top = rect.top + window.scrollY + "px";
+        }
+
+        if (element.classList.contains('postit-note') && element.dataset.rotation) {
+            element.style.transform = `rotate(${element.dataset.rotation}deg)`;
+        } else {
+            element.style.transform = 'none';
+        }
+
+        // Restore transitions
+        element.style.transition = '';
 
         // Handle grouping logic
         if (element.classList.contains('postit-note')) {
@@ -167,9 +229,8 @@ function makeDraggable(element, handle = element) {
                 const groupRect = group.getBoundingClientRect();
                 if (isColliding(elementRect, groupRect)) {
                     group.querySelector('.postit-group-content').appendChild(element);
-                    element.style.top = 'auto';
-                    element.style.left = 'auto';
                     droppedOnGroup = true;
+                    updateGroupStacking(group);
                     break;
                 }
             }
@@ -194,6 +255,10 @@ function makeDraggable(element, handle = element) {
                     element.style.left = elementRect.left + 'px';
                     element.style.top = elementRect.top + 'px';
 
+                    // Reset inline styles that might have been applied by group stacking
+                    element.style.position = 'absolute';
+                    element.style.transform = element.dataset.rotation ? `rotate(${element.dataset.rotation}deg)` : 'none';
+
                     // remove group if empty
                     const contentDiv = group.querySelector('.postit-group-content');
                     if(contentDiv.children.length <= 1) {
@@ -202,12 +267,42 @@ function makeDraggable(element, handle = element) {
                             document.getElementById('postit-container').appendChild(n);
                             n.style.left = groupRect.left + 'px';
                             n.style.top = groupRect.top + 'px';
+                            n.style.position = 'absolute';
+                            n.style.transform = n.dataset.rotation ? `rotate(${n.dataset.rotation}deg)` : 'none';
                         });
                         group.remove();
+                    } else {
+                        updateGroupStacking(group);
                     }
+                } else {
+                    // Dropped back inside the same group but maybe moved
+                    updateGroupStacking(group);
                 }
             }
         }
+    }
+}
+
+function updateGroupStacking(group) {
+    const notes = Array.from(group.querySelectorAll('.postit-group-content .postit-note'));
+    notes.forEach((note, index) => {
+        // Staggered vertical stack: offset by 30px top and 10px left
+        note.style.position = 'absolute';
+        note.style.left = `${index * 10}px`;
+        note.style.top = `${index * 30}px`;
+        // Ensure z-index follows stack order
+        note.style.zIndex = index + 1;
+        // Reset transform so they don't jump around, maybe keep slight rotation
+        let transformStr = note.dataset.rotation ? `rotate(${note.dataset.rotation}deg)` : 'none';
+        note.style.transform = transformStr;
+    });
+
+    // Adjust group content height to fit the stacked notes
+    const contentDiv = group.querySelector('.postit-group-content');
+    if (notes.length > 0) {
+        const lastNote = notes[notes.length - 1];
+        // 400 is max-height roughly, 50 is header
+        contentDiv.style.minHeight = `${(notes.length - 1) * 30 + 350}px`;
     }
 }
 
@@ -216,6 +311,18 @@ function isColliding(r1, r2) {
              r2.right < r1.left ||
              r2.top > r1.bottom ||
              r2.bottom < r1.top);
+}
+
+function toggleGroupCollapse(group) {
+    if (group.classList.contains('collapsed')) {
+        group.classList.remove('collapsed');
+        const btn = group.querySelector('.postit-group-header button:first-child');
+        if (btn) btn.textContent = '▼';
+    } else {
+        group.classList.add('collapsed');
+        const btn = group.querySelector('.postit-group-header button:first-child');
+        if (btn) btn.textContent = '▶';
+    }
 }
 
 function createGroup(notes, left, top) {
@@ -228,15 +335,16 @@ function createGroup(notes, left, top) {
     header.className = "postit-group-header";
     header.innerHTML = `
         <input type="text" value="New Group">
-        <button style="border:none;background:none;cursor:pointer;" onclick="this.closest('.postit-group').remove()">❌</button>
+        <div>
+            <button style="border:none;background:none;cursor:pointer;font-size:12px;" onclick="toggleGroupCollapse(this.closest('.postit-group'))">▼</button>
+            <button style="border:none;background:none;cursor:pointer;" onclick="this.closest('.postit-group').remove()">❌</button>
+        </div>
     `;
 
     const contentDiv = document.createElement("div");
     contentDiv.className = "postit-group-content";
 
     notes.forEach(note => {
-        note.style.left = 'auto';
-        note.style.top = 'auto';
         contentDiv.appendChild(note);
     });
 
@@ -245,6 +353,8 @@ function createGroup(notes, left, top) {
     document.getElementById('postit-container').appendChild(groupDiv);
 
     makeDraggable(groupDiv, header);
+
+    updateGroupStacking(groupDiv);
 }
 
 function createPostit(execResult) {
@@ -253,6 +363,7 @@ function createPostit(execResult) {
 
     // Random slight rotation
     const rotation = Math.random() * 6 - 3;
+    postit.dataset.rotation = rotation;
     postit.style.transform = `rotate(${rotation}deg)`;
 
     // Random position offset slightly from center
@@ -282,6 +393,72 @@ function createPostit(execResult) {
         resDiv.appendChild(img);
     } else if (execResult.type === "html") {
         resDiv.innerHTML = execResult.content;
+    } else if (execResult.type === "geojson_map" || execResult.type === "FeatureCollection") {
+        // Create a local map container
+        const mapDivId = `map-${Math.random().toString(36).substr(2, 9)}`;
+        const mapContainer = document.createElement("div");
+        mapContainer.id = mapDivId;
+        mapContainer.style.width = '100%';
+        mapContainer.style.height = '100%';
+        resDiv.appendChild(mapContainer);
+        resDiv.style.width = '100%';
+        resDiv.style.height = '100%';
+
+        // Wait for DOM to attach so map size is correct
+        setTimeout(() => {
+            const localMap = L.map(mapDivId).setView([52.155, 5.387], 8);
+
+            const pdokUrl = 'https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png';
+            L.tileLayer(pdokUrl, {
+                attribution: 'Kaartgegevens &copy; <a href="https://www.pdok.nl">PDOK</a>',
+                minZoom: 6,
+                maxZoom: 19
+            }).addTo(localMap);
+
+            let featuresData = execResult.type === "FeatureCollection" ? execResult.features : execResult.content.features;
+            if (featuresData && featuresData.length > 0) {
+                const geoJsonLayer = L.geoJSON(featuresData, {
+                    onEachFeature: function (feature, layer) {
+                        if (feature.properties) {
+                            let popupContent = '<div style="max-height: 200px; overflow-y: auto;">';
+                            popupContent += '<table class="table table-sm table-striped" style="margin-bottom:0;"><tbody>';
+                            for (let key in feature.properties) {
+                                let val = feature.properties[key];
+                                if (val !== null && val !== undefined) {
+                                    popupContent += `<tr><th>${key}</th><td>${val}</td></tr>`;
+                                }
+                            }
+                            popupContent += '</tbody></table></div>';
+                            layer.bindPopup(popupContent);
+                        }
+                    }
+                }).addTo(localMap);
+
+                if (geoJsonLayer.getBounds().isValid()) {
+                    localMap.fitBounds(geoJsonLayer.getBounds());
+                }
+            }
+
+            let tileServersData = execResult.type === "FeatureCollection" ? [] : (execResult.content.tile_servers || []);
+            if (tileServersData && tileServersData.length > 0) {
+                tileServersData.forEach(ts => {
+                    L.tileLayer(ts.url, {
+                        attribution: ts.attribution || '',
+                        minZoom: ts.minZoom || 0,
+                        maxZoom: ts.maxZoom || 19
+                    }).addTo(localMap);
+                });
+            }
+
+            // Setup resize observer for dynamic resizing (e.g., maximize/restore)
+            const ro = new ResizeObserver(() => {
+                localMap.invalidateSize();
+            });
+            ro.observe(resDiv);
+
+            // Add initial invalidateSize just in case
+            setTimeout(() => { localMap.invalidateSize(); }, 200);
+        }, 100);
     } else if (execResult.type === "plotly") {
         try {
             const plotData = typeof execResult.content === 'string' ? JSON.parse(execResult.content) : execResult.content;
@@ -381,7 +558,7 @@ function appendMessage(role, content, execResult=null, related=[]) {
     msgDiv.innerHTML = `<strong>${role}:</strong> <br>${formattedContent}`;
 
     if (execResult) {
-        if (!isMapMode && execResult.type !== "geojson_map" && execResult.type !== "FeatureCollection") {
+        if (!isMapMode || (execResult.type !== "geojson_map" && execResult.type !== "FeatureCollection")) {
             createPostit(execResult);
         } else {
             const resDiv = document.createElement("div");
@@ -616,6 +793,8 @@ async function sendMessage() {
         });
 
         const data = await response.json();
+        console.log("Backend response:", data);
+        console.log("Exec result type:", data.exec_result ? data.exec_result.type : "none");
         if (data.exec_result) {
             appendMessage("model", data.response, data.exec_result, data.related);
         } else {
@@ -653,6 +832,31 @@ async function scheduleJob() {
         if (statusDiv) statusDiv.textContent = `Job Scheduled: ${data.status}`;
     } catch (e) {
         if (statusDiv) statusDiv.textContent = "Error scheduling job.";
+    }
+}
+
+function clearUIHistory() {
+    if (historyDiv) {
+        historyDiv.innerHTML = "";
+    }
+}
+
+async function clearDBHistory() {
+    try {
+        const response = await fetch("/history", {
+            method: "DELETE",
+            headers: {
+                "x-forwarded-user": username
+            }
+        });
+
+        if (response.ok) {
+            clearUIHistory();
+        } else {
+            console.error("Failed to clear DB history");
+        }
+    } catch (e) {
+        console.error("Error communicating with backend to clear DB history:", e);
     }
 }
 

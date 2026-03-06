@@ -1,3 +1,11 @@
+import numpy as np
+import pandas as pd
+import xgboost as xgb
+import sklearn as skl
+import geopandas as gpd
+import plotly.express as px
+import plotly.graph_objects as go
+
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
@@ -7,12 +15,17 @@ from backend.models import Soul, ResearchStep, ChatHistory
 from backend.tools.data_tool import DataTool
 from backend.tools.file_tool import read_file, write_file
 from backend.tools.result_tool import map_content_to_frontend
+from backend.tools.ogc_api import ogc_apis
+from backend.tools.cbs_api import cbs_apis
 from sqlmodel import Session, select
+from textwrap import dedent
 import os
 import tempfile
+import copy
 import zipfile
 import shutil
 import asyncio
+import json
 
 from fastapi import UploadFile
 from mcp.client.stdio import stdio_client, StdioServerParameters
@@ -86,48 +99,78 @@ elif os.environ.get("AZURE_OPENAI_API_KEY"):
 else:
     model_name = 'test'
 
+level = "medior"
+dataframes = {}
+
+dfs_info, ogc_info, cbs_info, wfs_info = "", "", "", ""
+wfs_apis = {}
+
+for name, df in dataframes.items():
+    col_info = ", ".join([f"`{col}` ({dtype})" for col, dtype in df.dtypes.items()])
+    dfs_info += f"- {name}: {df.shape[0]} rows, {df.shape[1]} columns\n  - Columns: {col_info}\n"
+
+#metadata = get_relevant_metadata(list(dataframes.keys()))
+#metadata_part = f"\nWith metadata:\n  {json.dumps(metadata)}" if metadata else ""
+metadata_part = ""
+
+
+for api in ogc_apis:
+    ogc_info += f"         - {api['url']} : {api['title']}\n"
+for api in cbs_apis:
+    cbs_info += f"         - {api['url']} : {api['displaytitle']}\n"
+for api in wfs_apis:
+    wfs_info += f"         - {api['url']} : {api['displaytitle']}\n"
+    
+system_prompt=dedent(f"""
+        You are an expert Python data scientist talking to a {level} user. Always make sure user questions are specific, ask for information if necessary.
+        Return a Pydantic object with fields:
+        - answer (keep it concise, don't invent anything, use only Context below).
+        - related (2 SHORT related questions)
+        - code (A complete, self-contained hardened Python script without comments which produces the requested analysis/visualization. The script must contain variables `rows_used` holding the number of analyzed rows, and `result` holding the final output)
+        - disclaimer (A short disclaimer about data quality, limitations if applicable and urls of datasets used - use only Context below)
+        Based on the user question and chat history.
+
+        ### Context
+        - You have access to {len(dataframes)} pre-loaded (geo)pandas (Geo)DataFrames.
+        - Access them via the dictionary: dataframes['/datasets/subdir/name.csv']. Non-geometry columns may contain missing values, the hardened code should handle this.
+        - All GeoDataFrames are in EPSG:4326 (WGS84). Never modify geometry CRS.
+        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, fo, gpd, dataframes, sklearn, xgb
+        - The available dataframes and their schemas are:
+        {dfs_info}{metadata_part}
+        {f"- Available OGC APIs are (bbox filter only and use link-based pagination (999)):\n {json.dumps(ogc_apis)}" if ogc_info else ""}
+        {f"- Available CBS APIs are (use appropriate RegioS filters and pagination (9999)):\n {json.dumps(cbs_apis)}" if cbs_info else ""}
+        {f"- Available WFS APIs are: {wfs_info}" if wfs_info else ""}
+
+        ### Directives for the `code` field
+        1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments.
+        2. Case-Insensitive Comparisons: When performing string comparisons (e.g., in filters or groupings), always convert text to lowercase.
+        3. When you group by year, you use ticks of 1 year in charts.
+        4. For Map Visualizations: Use folium (fo) for any geospatial visualizations. Ensure maps are clear and informative. Always use folium.GeoJson(geodataframe). Do not add fo.TileLayer and fo.LayerControl to the map as they are added externally.
+        5. Final Output: The result of your script MUST be assigned to a variable named `result`.
+
+        ### Output Requirements for `result` variable
+        1. Allowed Types:
+            - folium.Map
+            - plotly.graph_objects.Figure
+            - pandas.DataFrame
+            - {{'type': 'download', 'data': bytes, 'filename': str, 'mime': str, 'label': str}}
+            - str
+        2. Prioritize visualizing results as a folium.Map or plotly.graph_objects.Figure. If neither is possible, use a pandas.DataFrame or str, in that order.
+        3. Visualization Style:
+            - Folium: use a high-contrast color for geometry and light colors for the map. Zoomlevel should show all geometries.
+            - Plotly: default theme with clear titles and axis labels.
+        4. The `code` string must contain only raw Python code (with `result` variable), no surrounding backticks or markdown.
+        If no code is needed, set `code` to null and provide an explanation in `answer`.
+    """)
+
+print(f"prompt={system_prompt}")
+
 # Define the agent
 agent = Agent(
     model_name,
     deps_type=AgentDeps,
     output_type=AgentResponse,
-    system_prompt=(
-        "You are a helpful data science assistant. "
-        "Your goal is to help the user analyze data and answer questions by returning executable Python code. "
-        "You MUST structure your response according to the defined schema. "
-        "The `code` field MUST contain valid Python code. "
-        "Valid types are: 'dataframe', 'text', 'plotly', 'geojson_map', 'features'. "
-        "Do not assume any imports are pre-loaded; import everything you need in the code block. "
-        "You have access to a SQL database (DuckDB) via the `run_data_query` tool if you need to inspect data while planning. "
-        "You can also read and write files in your workspace. "
-        "When querying data, always consider performance and use LIMIT clauses if not specified. "
-        "If the data contains coordinates in RD (EPSG:28992), they will be automatically transformed to WGS84 by the tool, "
-        "so you can focus on the analysis. "
-        "Adapt your communication style to the user's preference defined in their Soul in the `disclaimer` or `followup`."
-        "  "
-        "### Directives for the `code` field"
-        "1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments."
-        "2. Case-Insensitive Comparisons: When performing string comparisons (e.g., in filters or groupings), always convert text to lowercase."
-        "3. When you group by year, you use ticks of 1 year in charts."
-        "4. For Map Visualizations use geopandas or folium and return the features as geojson to the frontend."
-        "5. For Interactive Graphs use plotly.graph_objects.Figure instead of matplotlib."
-        "6. Final Output: The result of your script MUST be assigned to a variable named `result`."
-        "  "
-        "### Output Requirements for `result` variable"
-        "1. Allowed Types:"
-        "    - folium.Map"
-        "    - plotly.graph_objects.Figure"
-        "    - pandas.DataFrame"
-        "    - {{'type': 'download', 'data': bytes, 'filename': str, 'mime': str, 'label': str}}"
-        "    - str"
-        "2. Prioritize visualizing results as a folium.Map or plotly.graph_objects.Figure. If neither is possible, use a pandas.DataFrame or str, in that order."
-        "3. Visualization Style:"
-        "    - Folium: use a high-contrast color for geometry and light colors for the map. Zoomlevel should show all geometries."
-        "    - Plotly: default theme with clear titles and axis labels."
-        "4. The `code` string must contain only raw Python code (with `result` variable), no surrounding backticks or markdown."
-        "  "
-        "If no code is needed, set `code` to null and provide an explanation in `answer`."
-    )
+    system_prompt=system_prompt
 )
 
 # Register tools explicitly
@@ -154,7 +197,6 @@ def write_file_content(ctx: RunContext[AgentDeps], filepath: str, content: str) 
 def add_soul_context(ctx: RunContext[AgentDeps]) -> str:
     soul = ctx.deps.user_soul
     return f"User Preferences: {soul.preferences}. Communication Style: {soul.style}."
-
 
 from pydantic_ai.toolsets import FunctionToolset
 
@@ -214,6 +256,15 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
         result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets)
         logger.info(result)
         return result.output
+
+def get_result(exec_globals, allowed_globals):
+    result = copy.deepcopy(exec_globals["result"]) if "result" in exec_globals else None
+
+    for key in list(exec_globals.keys()):
+        if key not in allowed_globals and not key.startswith("__"):
+            del exec_globals[key]
+
+    return result
 
 async def run_agent(query: str, deps: AgentDeps) -> dict:
     """
@@ -281,14 +332,19 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
     # Execute the generated Python code
-    env = {}
+    exec_globals = { "np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl }
+    allowed_globals = set(exec_globals.keys())
+    
     exec_result = None
     try:
         if agent_response.code:
             print(agent_response.code)
-            exec(agent_response.code, env)
-            if 'result' in env:
-                exec_result = map_content_to_frontend(env.get("result"))
+            exec(agent_response.code, exec_globals)
+
+            result = get_result(exec_globals, allowed_globals)
+            
+            if result is not None:
+                exec_result = map_content_to_frontend(result)
                 print(exec_result);
             else:
                 exec_result = {"type": "error", "content": "Agent code executed but did not set the 'result' variable."}
