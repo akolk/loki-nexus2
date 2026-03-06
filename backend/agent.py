@@ -101,7 +101,7 @@ else:
 level = "medior"
 dataframes = {}
 
-dfs_info, ogc_info, cbs_info = "", "", ""
+dfs_info, ogc_info, cbs_info, wfs_info = "", "", "", ""
 wfs_apis = {}
 
 for name, df in dataframes.items():
