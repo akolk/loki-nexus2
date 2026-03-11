@@ -133,7 +133,7 @@ system_prompt=dedent(f"""
         ### Context
         - You have access to {len(dataframes)} pre-loaded (geo)pandas (Geo)DataFrames.
         - Access them via the dictionary: dataframes['/datasets/subdir/name.csv']. Non-geometry columns may contain missing values, the hardened code should handle this.
-        - All GeoDataFrames are in EPSG:4326 (WGS84). Never modify geometry CRS.
+        - Geospatial calculations must be performed in EPSG:28992 (RD New). Visualizing data on the map must be in WGS84 (EPSG:4326).
         - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, fo, gpd, dataframes, sklearn, xgb
         - The available dataframes and their schemas are:
         {dfs_info}{metadata_part}
@@ -260,8 +260,10 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
 def get_result(exec_globals, allowed_globals):
     result = copy.deepcopy(exec_globals["result"]) if "result" in exec_globals else None
 
-    for key in list(exec_globals.keys()):
-        if key not in allowed_globals and not key.startswith("__"):
+    # Identify keys to delete using set difference for better performance
+    keys_to_delete = exec_globals.keys() - allowed_globals
+    for key in keys_to_delete:
+        if not key.startswith("__"):
             del exec_globals[key]
 
     return result
@@ -305,8 +307,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
 
     # Reverse to chronological order (oldest first)
     # The result of all() on a slice/limit query might be a list, we reverse it.
-    history_records: List[ChatHistory] = list(history_records)
-    history_records.reverse()
+    history_records = list(history_records)[::-1]
 
     message_history: List[ModelMessage] = []
 
