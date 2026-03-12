@@ -122,7 +122,7 @@ async def chat_endpoint(
             mcp_type=mcp_type,
             skill_file=skill_file
         )
-        print(deps)
+        logger.debug(f"Deps: {deps}")
 
         # Enrich prompt with BBox if available
         final_message = message
@@ -137,7 +137,7 @@ async def chat_endpoint(
         session.refresh(user_msg)
 
         # Run agent with enriched message
-        print(final_message)
+        logger.debug(f"Final message: {final_message}")
         agent_out = await run_agent(final_message, deps)
 
         response_text = agent_out["response"]["answer"]

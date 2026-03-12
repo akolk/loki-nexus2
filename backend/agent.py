@@ -162,7 +162,7 @@ system_prompt=dedent(f"""
         If no code is needed, set `code` to null and provide an explanation in `answer`.
     """)
 
-print(f"prompt={system_prompt}")
+logger.debug(f"prompt={system_prompt}")
 
 # Define the agent
 agent = Agent(
@@ -321,7 +321,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     # Run the agent with history and toolsets
     try:
         agent_response = await _connect_mcp_and_run(query, deps, message_history, toolsets)
-        print(agent_response)
+        logger.debug(f"Agent response: {agent_response}")
     except Exception as e:
         logger.error(f"Error executing agent in run_agent: {e}", exc_info=True)
         if tmp_dir:
@@ -338,14 +338,14 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     exec_result = None
     try:
         if agent_response.code:
-            print(agent_response.code)
+            logger.debug(f"Executing code: {agent_response.code}")
             exec(agent_response.code, exec_globals)
 
             result = get_result(exec_globals, allowed_globals)
             
             if result is not None:
                 exec_result = map_content_to_frontend(result)
-                print(exec_result);
+                logger.debug(f"Exec result: {exec_result}")
             else:
                 exec_result = {"type": "error", "content": "Agent code executed but did not set the 'result' variable."}
         else:
