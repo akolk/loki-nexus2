@@ -133,8 +133,8 @@ system_prompt=dedent(f"""
         ### Context
         - You have access to {len(dataframes)} pre-loaded (geo)pandas (Geo)DataFrames.
         - Access them via the dictionary: dataframes['/datasets/subdir/name.csv']. Non-geometry columns may contain missing values, the hardened code should handle this.
-        - All GeoDataFrames are in EPSG:4326 (WGS84). Never modify geometry CRS.
-        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, fo, gpd, dataframes, sklearn, xgb
+        - Calculations must be performed in EPSG:28992 (RD New) and visualizations must be returned in WGS84 (EPSG:4326).
+        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb
         - The available dataframes and their schemas are:
         {dfs_info}{metadata_part}
         {f"- Available OGC APIs are (bbox filter only and use link-based pagination (999)):\n {json.dumps(ogc_apis)}" if ogc_info else ""}
@@ -145,19 +145,18 @@ system_prompt=dedent(f"""
         1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments.
         2. Case-Insensitive Comparisons: When performing string comparisons (e.g., in filters or groupings), always convert text to lowercase.
         3. When you group by year, you use ticks of 1 year in charts.
-        4. For Map Visualizations: Use folium (fo) for any geospatial visualizations. Ensure maps are clear and informative. Always use folium.GeoJson(geodataframe). Do not add fo.TileLayer and fo.LayerControl to the map as they are added externally.
+        4. For Map Visualizations: Return a `geopandas.GeoDataFrame`. It will be rendered on the Leaflet map automatically. Ensure all returned geospatial data is in EPSG:4326.
         5. Final Output: The result of your script MUST be assigned to a variable named `result`.
 
         ### Output Requirements for `result` variable
         1. Allowed Types:
-            - folium.Map
+            - geopandas.GeoDataFrame
             - plotly.graph_objects.Figure
             - pandas.DataFrame
             - {{'type': 'download', 'data': bytes, 'filename': str, 'mime': str, 'label': str}}
             - str
-        2. Prioritize visualizing results as a folium.Map or plotly.graph_objects.Figure. If neither is possible, use a pandas.DataFrame or str, in that order.
+        2. Prioritize visualizing results as a geopandas.GeoDataFrame or plotly.graph_objects.Figure. If neither is possible, use a pandas.DataFrame or str, in that order.
         3. Visualization Style:
-            - Folium: use a high-contrast color for geometry and light colors for the map. Zoomlevel should show all geometries.
             - Plotly: default theme with clear titles and axis labels.
         4. The `code` string must contain only raw Python code (with `result` variable), no surrounding backticks or markdown.
         If no code is needed, set `code` to null and provide an explanation in `answer`.

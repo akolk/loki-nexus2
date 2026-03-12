@@ -5,6 +5,7 @@ The project is a full-stack data science workspace using Pydantic AI as the core
 ## Product Features
 
 - **Pydantic AI engine**: Used to generate Python code based on user questions. The backend executes this code and returns a JSON structured response containing `type` and `content`.
+- **Backend agent generated code**: Built with strict geospatial data rules. Performs calculations in EPSG:28992 (RD New) and visualizes data on the map in WGS84 (EPSG:4326). Returns GeoDataFrames directly.
 - **Geospatial Processing**: Built with strict geospatial data rules. Performs calculations in EPSG:28992 (RD New) and visualizes data on the map in WGS84 (EPSG:4326).
 - **Map Visualization**: The frontend Leaflet map utilizes the PDOK tile server (BRT Achtergrondkaart) for accurate maps of the Netherlands.
 - **Tools Integration**: Supports Model Context Protocol (MCP) servers and localized Skill zip files via `pydantic-ai-skills` to dynamically enhance agent capabilities.
