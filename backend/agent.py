@@ -259,8 +259,10 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
 def get_result(exec_globals, allowed_globals):
     result = copy.deepcopy(exec_globals["result"]) if "result" in exec_globals else None
 
-    for key in list(exec_globals.keys()):
-        if key not in allowed_globals and not key.startswith("__"):
+    # Identify keys to delete using set difference for better performance
+    keys_to_delete = exec_globals.keys() - allowed_globals
+    for key in keys_to_delete:
+        if not key.startswith("__"):
             del exec_globals[key]
 
     return result
@@ -304,8 +306,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
 
     # Reverse to chronological order (oldest first)
     # The result of all() on a slice/limit query might be a list, we reverse it.
-    history_records: List[ChatHistory] = list(history_records)
-    history_records.reverse()
+    history_records = list(history_records)[::-1]
 
     message_history: List[ModelMessage] = []
 
