@@ -2,6 +2,8 @@ import json
 import logging
 import requests
 
+logger = logging.getLogger(__name__)
+
 ogc_apis = [{"displaytitle": "3D Basisvoorziening (OGC API) - 3D Tiles Gebouwen", "title": "3D Tiles Gebouwen",
              "url": "https://api.pdok.nl/kadaster/3d-basisvoorziening/ogc/v1/collections/gebouwen/items",
              "description": "De 3D Tiles Gebouwen worden gegenereerd door de BAG-geometrie van het gebouw op te trekken tot een enkele hoogte (LoD1.3). De 3D Tiles Gebouwen zijn beschikbaar in het (OGC) 3D Tiles formaat ten behoeve van visualisatie doeleinden en bevatten beperkte attribuut informatie. Deze wordt alleen aangeboden in de meest recent beschikbare jaargang."},
@@ -1822,11 +1824,11 @@ def fetch_ogc_data(url):
 def fetch_ogc_collections(apiurl, itemType="feature"):
     try:
         url = apiurl.rstrip('/') + "/collections?f=json"
-        print(url)
+        logger.debug(f"Fetching collections from {url}")
         response = requests.get(url)
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
-        print(e)
+        logger.error(f"Failed to fetch collections from {url}: {e}", exc_info=True)
         return None
     return response.json()
 

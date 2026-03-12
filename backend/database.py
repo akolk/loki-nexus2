@@ -25,18 +25,21 @@ SQL_ECHO = os.environ.get("SQL_ECHO", "False").lower() in ("true", "1", "t")
 
 engine = create_engine(DATABASE_URL, echo=SQL_ECHO)
 
+import logging
+logger = logging.getLogger(__name__)
+
 def init_db():
     retries = 10
     while retries > 0:
         try:
             SQLModel.metadata.create_all(engine)
-            print("Database initialized.")
+            logger.info("Database initialized.")
             return
         except OperationalError:
-            print("Waiting for database...")
+            logger.info("Waiting for database...")
             time.sleep(2)
             retries -= 1
-    print("Failed to initialize database.")
+    logger.error("Failed to initialize database.")
 
 def get_session() -> Generator[Session, None, None]:
     with Session(engine) as session:

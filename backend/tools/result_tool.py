@@ -1,6 +1,9 @@
 import geopandas as gpd
 import pandas as pd
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 def _get_polars_df():
     try:
@@ -17,7 +20,7 @@ def _get_plotly_fig():
         return ()
 
 def map_content_to_frontend(content):
-    print(f"MAP_TO_CONTENT: {type(content)}")
+    logger.debug(f"MAP_TO_CONTENT: {type(content)}")
     if isinstance(content, gpd.GeoDataFrame):
         # Convert to WGS84 just in case, typical for Leaflet
         if content.crs and content.crs.to_string() != "EPSG:4326":
