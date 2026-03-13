@@ -58,6 +58,7 @@ def write_file_tool(filepath: str, content: str) -> str:
     return write_file(filepath, content)
 
 
+
 @dataclass
 class AgentDeps:
     user_soul: Soul
@@ -184,12 +185,12 @@ def data_query(ctx: RunContext[AgentDeps], query: str) -> str:
     return run_data_query_tool(query, username=ctx.deps.user_soul.username)
 
 @agent.tool
-def pdok_ogc_api(ctx: RunContext[AgentDeps], ogc_dataset) -> str:
+def pdok_ogc_api(ctx: RunContext[AgentDeps], ogc_dataset: str) -> str:
     """Return the URL of the best OGC Dataset match."""
     return read_file_tool(filepath)
 
 @agent.tool
-def cbs_api(ctx: RunContext[AgentDeps], cbs_dataset) -> str:
+def cbs_api(ctx: RunContext[AgentDeps], cbs_dataset: str) -> str:
     """Return the URL of the best CBS Dataset match."""
     return read_file_tool(filepath)
 
