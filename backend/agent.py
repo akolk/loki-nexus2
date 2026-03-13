@@ -184,6 +184,16 @@ def data_query(ctx: RunContext[AgentDeps], query: str) -> str:
     return run_data_query_tool(query, username=ctx.deps.user_soul.username)
 
 @agent.tool
+def pdok_ogc_api(ctx: RunContext[AgentDeps], ogc_dataset) -> str:
+    """Return the URL of the best OGC Dataset match."""
+    return read_file_tool(filepath)
+
+@agent.tool
+def cbs_api(ctx: RunContext[AgentDeps], cbs_dataset) -> str:
+    """Return the URL of the best CBS Dataset match."""
+    return read_file_tool(filepath)
+
+@agent.tool
 def read_file_content(ctx: RunContext[AgentDeps], filepath: str) -> str:
     """Read the content of a file."""
     return read_file_tool(filepath)
