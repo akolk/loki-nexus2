@@ -72,7 +72,7 @@ class AgentResponse(BaseModel):
         ...,
         description="Short description of the results or why the request cannot be fulfilled."
     )
-    related: List[str] = Field(
+    related: Optional[List[str]] = Field(
         default=None,
         max_length=3,
         description="number of SHORT related follow-up USER questions a USER may ask."
@@ -162,7 +162,7 @@ system_prompt=dedent(f"""
         If no code is needed, set `code` to null and provide an explanation in `answer`.
     """)
 
-print(f"prompt={system_prompt}")
+logger.debug(f"prompt={system_prompt}")
 
 # Define the agent
 agent = Agent(
@@ -294,7 +294,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
             skill_toolset = SkillsToolset(skills_dir)
             toolsets.append(skill_toolset)
         except Exception as e:
-            print(f"Failed to load skills: {e}")
+            logger.error(f"Failed to load skills: {e}")
 
     # Load chat history
     # Pydantic AI uses a list of messages. We need to convert our DB history to Pydantic AI messages.
@@ -321,7 +321,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     # Run the agent with history and toolsets
     try:
         agent_response = await _connect_mcp_and_run(query, deps, message_history, toolsets)
-        print(agent_response)
+        logger.debug(f"agent_response={agent_response}")
     except Exception as e:
         logger.error(f"Error executing agent in run_agent: {e}", exc_info=True)
         if tmp_dir:
@@ -338,14 +338,14 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     exec_result = None
     try:
         if agent_response.code:
-            print(agent_response.code)
+            logger.debug(f"Executing generated code:\n{agent_response.code}")
             exec(agent_response.code, exec_globals)
 
             result = get_result(exec_globals, allowed_globals)
             
             if result is not None:
                 exec_result = map_content_to_frontend(result)
-                print(exec_result);
+                logger.debug(f"exec_result={exec_result}")
             else:
                 exec_result = {"type": "error", "content": "Agent code executed but did not set the 'result' variable."}
         else:
@@ -353,7 +353,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
                 "type" : "answer", 
                 "content": { 
                     "answer" : agent_response.answer,
-                    "releated": agent_response.related,
+                    "related": agent_response.related or [],
                     "disclaimer": agent_response.disclaimer,
                     "code": agent_response.code
                 }        
@@ -381,7 +381,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     return {
         "response": {
             "answer" : agent_response.answer,
-            "releated": agent_response.related,
+            "related": agent_response.related or [],
             "disclaimer": agent_response.disclaimer,
             "code": agent_response.code
         },

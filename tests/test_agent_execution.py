@@ -14,6 +14,24 @@ def db_session():
         yield session
 
 @pytest.mark.asyncio
+async def test_run_agent_execution_with_null_related(db_session):
+    soul = Soul(user_id="1", username="test_user", style="concise")
+    deps = AgentDeps(user_soul=soul, db_session=db_session, user_id=1)
+
+    mock_agent_response = AgentResponse(
+        answer="Answer without related questions.",
+        related=None,
+        code="result = {'data': 'test_data2', 'type': 'dict'}",
+        disclaimer="Mock disclaimer"
+    )
+
+    with patch('backend.agent._connect_mcp_and_run', return_value=mock_agent_response):
+        res = await run_agent("Test no related", deps)
+
+        assert "related" in res["response"]
+        assert res["response"]["related"] == []
+
+@pytest.mark.asyncio
 async def test_run_agent_execution(db_session):
     # Setup dependencies
     soul = Soul(user_id="1", username="test_user", style="concise")
@@ -36,3 +54,5 @@ async def test_run_agent_execution(db_session):
         #    return content
         assert res["exec_result"]["data"] == "test_data"
         assert res["response"]["answer"] == "Here is the execution result."
+        assert "related" in res["response"]
+        assert res["response"]["related"] == ["Q1?"]
