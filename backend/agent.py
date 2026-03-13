@@ -146,6 +146,7 @@ system_prompt=dedent(f"""
         2. Case-Insensitive Comparisons: When performing string comparisons (e.g., in filters or groupings), always convert text to lowercase.
         3. When you group by year, you use ticks of 1 year in charts.
         4. For Map Visualizations: Return a `geopandas.GeoDataFrame`. It will be rendered on the Leaflet map automatically. Ensure all returned geospatial data is in EPSG:4326.
+        5. For Graphs: Return a `plotly.graph_objects.Figure`. It will be converted to json and transferred to the frontend.
         5. Final Output: The result of your script MUST be assigned to a variable named `result`.
 
         ### Output Requirements for `result` variable
