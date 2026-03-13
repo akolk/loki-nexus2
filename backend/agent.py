@@ -132,6 +132,7 @@ system_prompt=dedent(f"""
 
         ### Context
         - You have access to {len(dataframes)} pre-loaded (geo)pandas (Geo)DataFrames.
+        - You may access the internet for OGC APIs or CBS APIs.
         - Access them via the dictionary: dataframes['/datasets/subdir/name.csv']. Non-geometry columns may contain missing values, the hardened code should handle this.
         - Calculations must be performed in EPSG:28992 (RD New) and visualizations must be returned in WGS84 (EPSG:4326).
         - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb
