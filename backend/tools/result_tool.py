@@ -40,7 +40,7 @@ def map_content_to_frontend(content):
         return {"type": "plotly", "content": content.to_json()}
 
     elif isinstance(content, dict):
-        if content.get("type") in ["geojson_map", "dataframe", "picture", "html", "plotly", "folium", "dict"]:
+        if content.get("type") in ["geojson_map", "dataframe", "picture", "html", "plotly", "dict"]:
             return content
         return {"type": content.get("type"), "content": content}
 

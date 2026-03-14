@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext, Tool
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
+from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
 from backend.models import Soul, ResearchStep, ChatHistory
 from backend.tools.data_tool import DataTool
 from backend.tools.file_tool import read_file, write_file
@@ -56,8 +57,7 @@ def read_file_tool(filepath: str) -> str:
 def write_file_tool(filepath: str, content: str) -> str:
     """Write to a file."""
     return write_file(filepath, content)
-
-
+    
 @dataclass
 class AgentDeps:
     user_soul: Soul
@@ -68,18 +68,18 @@ class AgentDeps:
     skill_file: Optional[UploadFile] = None
 
 class AgentResponse(BaseModel):
+    code: Optional[str] = Field(
+        default=None,
+        description="Complete, runnable Python script (no backticks) that assigns the final output to `result`."
+    )
     answer: str = Field( 
         ...,
         description="Short description of the results or why the request cannot be fulfilled."
     )
-    related: List[str] = Field(
+    related: Optional[List[str]] = Field(
         default=None,
         max_length=3,
         description="number of SHORT related follow-up USER questions a USER may ask."
-    )
-    code: Optional[str] = Field(
-        default=None,
-        description="Complete, runnable Python script (no backticks) that assigns the final output to `result`."
     )
     disclaimer: Optional[str] = Field(
         default=None,
@@ -99,11 +99,14 @@ elif os.environ.get("AZURE_OPENAI_API_KEY"):
 else:
     model_name = 'test'
 
+model = OpenAIResponsesModel('gpt-5.2')
+settings = OpenAIResponsesModelSettings(
+    openai_reasoning_effort = os.environ.get("OPENAI_REASONING_EFFORT", "low"),
+    openai_reasoning_summary = os.environ.get("OPENAI_REASONING_SUMMARY", "detailed")
+)
+
 level = "medior"
 dataframes = {}
-
-dfs_info, ogc_info, cbs_info, wfs_info = "", "", "", ""
-wfs_apis = {}
 
 for name, df in dataframes.items():
     col_info = ", ".join([f"`{col}` ({dtype})" for col, dtype in df.dtypes.items()])
@@ -112,14 +115,6 @@ for name, df in dataframes.items():
 #metadata = get_relevant_metadata(list(dataframes.keys()))
 #metadata_part = f"\nWith metadata:\n  {json.dumps(metadata)}" if metadata else ""
 metadata_part = ""
-
-
-for api in ogc_apis:
-    ogc_info += f"         - {api['url']} : {api['title']}\n"
-for api in cbs_apis:
-    cbs_info += f"         - {api['url']} : {api['displaytitle']}\n"
-for api in wfs_apis:
-    wfs_info += f"         - {api['url']} : {api['displaytitle']}\n"
     
 system_prompt=dedent(f"""
         You are an expert Python data scientist talking to a {level} user. Always make sure user questions are specific, ask for information if necessary.
@@ -131,46 +126,41 @@ system_prompt=dedent(f"""
         Based on the user question and chat history.
 
         ### Context
-        - You have access to {len(dataframes)} pre-loaded (geo)pandas (Geo)DataFrames.
-        - Access them via the dictionary: dataframes['/datasets/subdir/name.csv']. Non-geometry columns may contain missing values, the hardened code should handle this.
-        - All GeoDataFrames are in EPSG:4326 (WGS84). Never modify geometry CRS.
-        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, fo, gpd, dataframes, sklearn, xgb
-        - The available dataframes and their schemas are:
-        {dfs_info}{metadata_part}
-        {f"- Available OGC APIs are (bbox filter only and use link-based pagination (999)):\n {json.dumps(ogc_apis)}" if ogc_info else ""}
-        {f"- Available CBS APIs are (use appropriate RegioS filters and pagination (9999)):\n {json.dumps(cbs_apis)}" if cbs_info else ""}
-        {f"- Available WFS APIs are: {wfs_info}" if wfs_info else ""}
+        - You may access the internet for OGC APIs or CBS APIs returned by the tools.
+        - Calculations must be performed in EPSG:28992 (RD New) and visualizations must be returned in WGS84 (EPSG:4326).
+        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb
 
         ### Directives for the `code` field
         1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments.
         2. Case-Insensitive Comparisons: When performing string comparisons (e.g., in filters or groupings), always convert text to lowercase.
         3. When you group by year, you use ticks of 1 year in charts.
-        4. For Map Visualizations: Use folium (fo) for any geospatial visualizations. Ensure maps are clear and informative. Always use folium.GeoJson(geodataframe). Do not add fo.TileLayer and fo.LayerControl to the map as they are added externally.
+        4. For Map Visualizations: Return a `geopandas.GeoDataFrame`. It will be rendered on the Leaflet map automatically. Ensure all returned geospatial data is in EPSG:4326.
+        5. For Graphs Visualizations: Return a `plotly.graph_objects.Figure`. It will be converted to json and transferred to the frontend.
         5. Final Output: The result of your script MUST be assigned to a variable named `result`.
 
         ### Output Requirements for `result` variable
         1. Allowed Types:
-            - folium.Map
+            - geopandas.GeoDataFrame
             - plotly.graph_objects.Figure
             - pandas.DataFrame
             - {{'type': 'download', 'data': bytes, 'filename': str, 'mime': str, 'label': str}}
             - str
-        2. Prioritize visualizing results as a folium.Map or plotly.graph_objects.Figure. If neither is possible, use a pandas.DataFrame or str, in that order.
+        2. Prioritize visualizing results as a geopandas.GeoDataFrame or plotly.graph_objects.Figure. If neither is possible, use a pandas.DataFrame or str, in that order.
         3. Visualization Style:
-            - Folium: use a high-contrast color for geometry and light colors for the map. Zoomlevel should show all geometries.
             - Plotly: default theme with clear titles and axis labels.
         4. The `code` string must contain only raw Python code (with `result` variable), no surrounding backticks or markdown.
         If no code is needed, set `code` to null and provide an explanation in `answer`.
     """)
 
-print(f"prompt={system_prompt}")
+logger.debug(f"prompt={system_prompt}")
 
 # Define the agent
 agent = Agent(
     model_name,
     deps_type=AgentDeps,
     output_type=AgentResponse,
-    system_prompt=system_prompt
+    system_prompt=system_prompt,
+    model_settings=model
 )
 
 # Register tools explicitly
@@ -183,6 +173,19 @@ def data_query(ctx: RunContext[AgentDeps], query: str) -> str:
     return run_data_query_tool(query, username=ctx.deps.user_soul.username)
 
 @agent.tool
+def pdok_ogc_api(ctx: RunContext[AgentDeps], ogc_dataset: str) -> str:
+    """Return the URL of the best OGC Dataset match."""
+    logger.info(f"PDOK_OGC_API: {ogc_dataset}")
+    return "https://api.pdok.nl/lv/bgt/ogc/v1/collections/pand/items"
+    
+
+@agent.tool
+def cbs_api(ctx: RunContext[AgentDeps], cbs_dataset: str) -> str:
+    """Return the URL of the best CBS Dataset match."""
+    logger.info(f"CBS_API: {ogc_dataset}")
+    return "https://api.pdok.nl/lv/bgt/ogc/v1/collections/pand/items"
+
+@agent.tool
 def read_file_content(ctx: RunContext[AgentDeps], filepath: str) -> str:
     """Read the content of a file."""
     return read_file_tool(filepath)
@@ -192,6 +195,10 @@ def write_file_content(ctx: RunContext[AgentDeps], filepath: str, content: str) 
     """Write content to a file."""
     return write_file_tool(filepath, content)
 
+@agent.tool
+def search_tool(ctx: RunContext[AgentDeps], filepath: str, content: str) -> str:
+    """Find the project-specific tools needed to continue the task."""
+    return write_file_tool(filepath, content)
 
 @agent.system_prompt
 def add_soul_context(ctx: RunContext[AgentDeps]) -> str:
@@ -252,7 +259,7 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
                 result = await agent.run(query, deps=deps, message_history=message_history, toolsets=run_toolsets)
                 return result.output
     else:
-        logger.info(query)
+        logger.info(toolsets)
         result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets)
         logger.info(result)
         return result.output
@@ -260,8 +267,10 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
 def get_result(exec_globals, allowed_globals):
     result = copy.deepcopy(exec_globals["result"]) if "result" in exec_globals else None
 
-    for key in list(exec_globals.keys()):
-        if key not in allowed_globals and not key.startswith("__"):
+    # Identify keys to delete using set difference for better performance
+    keys_to_delete = exec_globals.keys() - allowed_globals
+    for key in keys_to_delete:
+        if not key.startswith("__"):
             del exec_globals[key]
 
     return result
@@ -293,7 +302,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
             skill_toolset = SkillsToolset(skills_dir)
             toolsets.append(skill_toolset)
         except Exception as e:
-            print(f"Failed to load skills: {e}")
+            logger.error(f"Failed to load skills: {e}")
 
     # Load chat history
     # Pydantic AI uses a list of messages. We need to convert our DB history to Pydantic AI messages.
@@ -305,8 +314,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
 
     # Reverse to chronological order (oldest first)
     # The result of all() on a slice/limit query might be a list, we reverse it.
-    history_records: List[ChatHistory] = list(history_records)
-    history_records.reverse()
+    history_records = list(history_records)[::-1]
 
     message_history: List[ModelMessage] = []
 
@@ -320,8 +328,10 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
 
     # Run the agent with history and toolsets
     try:
+        logger.info(message_history)
+        logger.info(query)
         agent_response = await _connect_mcp_and_run(query, deps, message_history, toolsets)
-        print(agent_response)
+        logger.debug(f"agent_response={agent_response}")
     except Exception as e:
         logger.error(f"Error executing agent in run_agent: {e}", exc_info=True)
         if tmp_dir:
@@ -338,14 +348,14 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     exec_result = None
     try:
         if agent_response.code:
-            print(agent_response.code)
+            logger.debug(f"Executing generated code:\n{agent_response.code}")
             exec(agent_response.code, exec_globals)
 
             result = get_result(exec_globals, allowed_globals)
             
             if result is not None:
                 exec_result = map_content_to_frontend(result)
-                print(exec_result);
+                logger.debug(f"exec_result={exec_result}")
             else:
                 exec_result = {"type": "error", "content": "Agent code executed but did not set the 'result' variable."}
         else:
@@ -353,7 +363,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
                 "type" : "answer", 
                 "content": { 
                     "answer" : agent_response.answer,
-                    "releated": agent_response.related,
+                    "related": agent_response.related or [],
                     "disclaimer": agent_response.disclaimer,
                     "code": agent_response.code
                 }        
@@ -381,7 +391,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
     return {
         "response": {
             "answer" : agent_response.answer,
-            "releated": agent_response.related,
+            "related": agent_response.related or [],
             "disclaimer": agent_response.disclaimer,
             "code": agent_response.code
         },

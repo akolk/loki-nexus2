@@ -1,4 +1,5 @@
 import os
+import re
 import duckdb
 import logging
 from typing import List, Dict, Any, Optional
@@ -13,6 +14,9 @@ class DataTool:
 
     def __init__(self, db_path: str = ":memory:", username: Optional[str] = None):
         self.con = duckdb.connect(db_path)
+        # Sanitize username: only alphanumeric, underscores, hyphens, and dots
+        if username and not re.match(r'^[a-zA-Z0-9._-]+$', username):
+            raise ValueError(f"Invalid username: {username}")
         self.username = username
         # Install spatial extension if possible (might not work in all envs without internet/pre-install)
         # We skip this for now as it's complex to setup in sandboxed envs.
@@ -37,7 +41,12 @@ class DataTool:
                 logger.warning(f"Could not create {parquet_dir} due to PermissionError")
             sql_query = sql_query.replace("__PARQUET_DIR__", parquet_dir)
 
-        import re
+        # Enforce limit as integer
+        try:
+            limit = int(limit)
+        except (ValueError, TypeError):
+            limit = 100
+
         if not re.search(r'\blimit\b', sql_query, re.IGNORECASE):
             sql_query += f" LIMIT {limit}"
 
