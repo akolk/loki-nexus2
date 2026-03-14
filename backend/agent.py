@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext, Tool
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
+from pydantic_ai.models.openai import OpenAIChatModelSettings
 from backend.models import Soul, ResearchStep, ChatHistory
 from backend.tools.data_tool import DataTool
 from backend.tools.file_tool import read_file, write_file
@@ -100,17 +101,15 @@ elif os.environ.get("AZURE_OPENAI_API_KEY"):
 else:
     model_name = 'test'
 
-model = OpenAIResponsesModel('gpt-5.2')
-settings = OpenAIResponsesModelSettings(
-    openai_reasoning_effort = os.environ.get("OPENAI_REASONING_EFFORT", "low")
-    openai_reasoning_summary = os.environget("OPENAI_REASONING_SUMMARY", "detailed")
+settings = OpenAIChatModelSettings(
+    openai_reasoning_effort = os.environ.get("OPENAI_REASONING_EFFORT", "low"),
 )
 
 level = "medior"
 dataframes = {}
 
 dfs_info, ogc_info, cbs_info, wfs_info = "", "", "", ""
-wfs_apis = {}
+wfs_apis = []
 
 for name, df in dataframes.items():
     col_info = ", ".join([f"`{col}` ({dtype})" for col, dtype in df.dtypes.items()])
@@ -146,7 +145,7 @@ system_prompt=dedent(f"""
         1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments.
         2. Case-Insensitive Comparisons: When performing string comparisons (e.g., in filters or groupings), always convert text to lowercase.
         3. When you group by year, you use ticks of 1 year in charts.
-        4. For Map Visualizations: Return a `geopandas.GeoDataFrame`. It will be rendered on the Leaflet map automatically. Ensure all returned geospatial data is in EPSG:4326.
+        4. For Map Visualizations: Return a `geopandas.GeoDataFrame`. It will be rendered on the Leaflet map automatically. The backend handles coordinate transformation to EPSG:4326, so you may return data in EPSG:28992.
         5. For Graphs Visualizations: Return a `plotly.graph_objects.Figure`. It will be converted to json and transferred to the frontend.
         5. Final Output: The result of your script MUST be assigned to a variable named `result`.
 
@@ -171,8 +170,8 @@ agent = Agent(
     model_name,
     deps_type=AgentDeps,
     output_type=AgentResponse,
-    system_prompt=system_prompt
-    model_settings=model
+    system_prompt=system_prompt,
+    model_settings=settings
 )
 
 # Register tools explicitly
@@ -277,7 +276,9 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
         return result.output
 
 def get_result(exec_globals, allowed_globals):
-    result = copy.deepcopy(exec_globals["result"]) if "result" in exec_globals else None
+    # Retrieve the result directly without expensive deepcopy.
+    # Since exec_globals is locally scoped and discarded, returning the reference is safe.
+    result = exec_globals.get("result")
 
     # Identify keys to delete using set difference for better performance
     keys_to_delete = exec_globals.keys() - allowed_globals

@@ -27,3 +27,15 @@ def test_agent_deps_initialization():
     assert deps.user_soul.username == "test_user"
     assert deps.user_id == 1
     assert deps.mcp_url is None
+
+def test_agent_deps_with_mcp_url():
+    soul = Soul(user_id="1", username="test_user", style="concise")
+    deps = AgentDeps(user_soul=soul, db_session=None, user_id=1, mcp_url="http://test.mcp.url", mcp_type="SSE")
+
+    assert deps.mcp_url == "http://test.mcp.url"
+    assert deps.mcp_type == "SSE"
+
+def test_run_data_query_tool_creates_table():
+    # DuckDB should execute it correctly
+    res = run_data_query_tool("SELECT 1 AS num")
+    assert "[{'num': 1}]" in res
