@@ -235,7 +235,7 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
                 mcp_toolset = _create_mcp_toolset(mcp_session, tools.tools)
                 run_toolsets = toolsets + [mcp_toolset]
 
-                result = await agent.run(query, deps=deps, message_history=message_history, toolsets=run_toolsets, instructions=get_sysprompt())
+                result = await agent.run(query, deps=deps, message_history=message_history, toolsets=run_toolsets, instructions=sys_prompt())
                 return result.output
 
     elif deps.mcp_url and deps.mcp_type == 'STDIO':
