@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext, Tool
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
+from pydantic_ai.models.openai import OpenAIChatModelSettings
 from backend.models import Soul, ResearchStep, ChatHistory
 from backend.tools.data_tool import DataTool
 from backend.tools.file_tool import read_file, write_file
