@@ -100,6 +100,12 @@ elif os.environ.get("AZURE_OPENAI_API_KEY"):
 else:
     model_name = 'test'
 
+model = OpenAIResponsesModel('gpt-5.2')
+settings = OpenAIResponsesModelSettings(
+    openai_reasoning_effort = os.environ.get("OPENAI_REASONING_EFFORT", "low")
+    openai_reasoning_summary = os.environget("OPENAI_REASONING_SUMMARY", "detailed")
+)
+
 level = "medior"
 dataframes = {}
 
@@ -166,6 +172,7 @@ agent = Agent(
     deps_type=AgentDeps,
     output_type=AgentResponse,
     system_prompt=system_prompt
+    model_settings=model
 )
 
 # Register tools explicitly
