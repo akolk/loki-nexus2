@@ -132,23 +132,16 @@ system_prompt=dedent(f"""
         Based on the user question and chat history.
 
         ### Context
-        - You have access to {len(dataframes)} pre-loaded (geo)pandas (Geo)DataFrames.
-        - You may access the internet for OGC APIs or CBS APIs.
-        - Access them via the dictionary: dataframes['/datasets/subdir/name.csv']. Non-geometry columns may contain missing values, the hardened code should handle this.
+        - You may access the internet for OGC APIs or CBS APIs returned by the tools.
         - Calculations must be performed in EPSG:28992 (RD New) and visualizations must be returned in WGS84 (EPSG:4326).
         - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb
-        - The available dataframes and their schemas are:
-        {dfs_info}{metadata_part}
-        {f"- Available OGC APIs are (bbox filter only and use link-based pagination (999)):\n {json.dumps(ogc_apis)}" if ogc_info else ""}
-        {f"- Available CBS APIs are (use appropriate RegioS filters and pagination (9999)):\n {json.dumps(cbs_apis)}" if cbs_info else ""}
-        {f"- Available WFS APIs are: {wfs_info}" if wfs_info else ""}
 
         ### Directives for the `code` field
         1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments.
         2. Case-Insensitive Comparisons: When performing string comparisons (e.g., in filters or groupings), always convert text to lowercase.
         3. When you group by year, you use ticks of 1 year in charts.
         4. For Map Visualizations: Return a `geopandas.GeoDataFrame`. It will be rendered on the Leaflet map automatically. Ensure all returned geospatial data is in EPSG:4326.
-        5. For Graphs: Return a `plotly.graph_objects.Figure`. It will be converted to json and transferred to the frontend.
+        5. For Graphs Visualizations: Return a `plotly.graph_objects.Figure`. It will be converted to json and transferred to the frontend.
         5. Final Output: The result of your script MUST be assigned to a variable named `result`.
 
         ### Output Requirements for `result` variable
@@ -187,12 +180,15 @@ def data_query(ctx: RunContext[AgentDeps], query: str) -> str:
 @agent.tool
 def pdok_ogc_api(ctx: RunContext[AgentDeps], ogc_dataset: str) -> str:
     """Return the URL of the best OGC Dataset match."""
-    return read_file_tool(filepath)
+    logger.info(f"PDOK_OGC_API: {ogc_dataset}")
+    return "https://api.pdok.nl/lv/bgt/ogc/v1/collections/pand/items"
+    
 
 @agent.tool
 def cbs_api(ctx: RunContext[AgentDeps], cbs_dataset: str) -> str:
     """Return the URL of the best CBS Dataset match."""
-    return read_file_tool(filepath)
+    logger.info(f"CBS_API: {ogc_dataset}")
+    return "https://api.pdok.nl/lv/bgt/ogc/v1/collections/pand/items"
 
 @agent.tool
 def read_file_content(ctx: RunContext[AgentDeps], filepath: str) -> str:
