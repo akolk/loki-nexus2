@@ -102,7 +102,7 @@ else:
 
 model = OpenAIResponsesModel('gpt-5.2')
 settings = OpenAIResponsesModelSettings(
-    openai_reasoning_effort = os.environ.get("OPENAI_REASONING_EFFORT", "low")
+    openai_reasoning_effort = os.environ.get("OPENAI_REASONING_EFFORT", "low"),
     openai_reasoning_summary = os.environ.get("OPENAI_REASONING_SUMMARY", "detailed")
 )
 
