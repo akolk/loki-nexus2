@@ -264,7 +264,7 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
                 result = await agent.run(query, deps=deps, message_history=message_history, toolsets=run_toolsets)
                 return result.output
     else:
-        logger.info(query)
+        logger.info(toolsets)
         result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets)
         logger.info(result)
         return result.output
