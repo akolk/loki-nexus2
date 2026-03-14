@@ -3,6 +3,7 @@ import pandas as pd
 import xgboost as xgb
 import sklearn as skl
 import geopandas as gpd
+import polars as pl
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -134,7 +135,7 @@ system_prompt=dedent(f"""
         - You have access to {len(dataframes)} pre-loaded (geo)pandas (Geo)DataFrames.
         - Access them via the dictionary: dataframes['/datasets/subdir/name.csv']. Non-geometry columns may contain missing values, the hardened code should handle this.
         - All GeoDataFrames are in EPSG:4326 (WGS84). Never modify geometry CRS.
-        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, fo, gpd, dataframes, sklearn, xgb
+        - You may use ONLY the Python Standard Library and provided global variables: np, pd, pl, px, go, gpd, dataframes, sklearn, xgb
         - The available dataframes and their schemas are:
         {dfs_info}{metadata_part}
         {f"- Available OGC APIs are (bbox filter only and use link-based pagination (999)):\n {json.dumps(ogc_apis)}" if ogc_info else ""}
@@ -145,19 +146,21 @@ system_prompt=dedent(f"""
         1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments.
         2. Case-Insensitive Comparisons: When performing string comparisons (e.g., in filters or groupings), always convert text to lowercase.
         3. When you group by year, you use ticks of 1 year in charts.
-        4. For Map Visualizations: Use folium (fo) for any geospatial visualizations. Ensure maps are clear and informative. Always use folium.GeoJson(geodataframe). Do not add fo.TileLayer and fo.LayerControl to the map as they are added externally.
-        5. Final Output: The result of your script MUST be assigned to a variable named `result`.
+        4. For Map Visualizations: Use geopandas.GeoDataFrame for any geospatial visualizations. Ensure maps are clear and informative.
+        5. For Graph Visualizations: Always use plotly.graph_objects.Figure for graphs. Do not use matplotlib or other external libraries.
+        6. Final Output: The result of your script MUST be assigned to a variable named `result`.
 
         ### Output Requirements for `result` variable
         1. Allowed Types:
-            - folium.Map
+            - geopandas.GeoDataFrame
+            - polars.DataFrame
             - plotly.graph_objects.Figure
             - pandas.DataFrame
             - {{'type': 'download', 'data': bytes, 'filename': str, 'mime': str, 'label': str}}
             - str
-        2. Prioritize visualizing results as a folium.Map or plotly.graph_objects.Figure. If neither is possible, use a pandas.DataFrame or str, in that order.
+        2. Prioritize visualizing results as a geopandas.GeoDataFrame or plotly.graph_objects.Figure. If neither is possible, use a polars.DataFrame, pandas.DataFrame or str, in that order.
         3. Visualization Style:
-            - Folium: use a high-contrast color for geometry and light colors for the map. Zoomlevel should show all geometries.
+            - Map (GeoDataFrame): ensure it uses EPSG:4326.
             - Plotly: default theme with clear titles and axis labels.
         4. The `code` string must contain only raw Python code (with `result` variable), no surrounding backticks or markdown.
         If no code is needed, set `code` to null and provide an explanation in `answer`.
@@ -257,15 +260,6 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
         logger.info(result)
         return result.output
 
-def get_result(exec_globals, allowed_globals):
-    result = copy.deepcopy(exec_globals["result"]) if "result" in exec_globals else None
-
-    for key in list(exec_globals.keys()):
-        if key not in allowed_globals and not key.startswith("__"):
-            del exec_globals[key]
-
-    return result
-
 async def run_agent(query: str, deps: AgentDeps) -> dict:
     """
     Runs the agent and stores the result in the DB.
@@ -332,16 +326,15 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
     # Execute the generated Python code
-    exec_globals = { "np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl }
-    allowed_globals = set(exec_globals.keys())
+    exec_env = { "np": np, "pd": pd, "pl": pl, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl }
     
     exec_result = None
     try:
         if agent_response.code:
             print(agent_response.code)
-            exec(agent_response.code, exec_globals)
+            exec(agent_response.code, exec_env)
 
-            result = get_result(exec_globals, allowed_globals)
+            result = copy.deepcopy(exec_env.get("result"))
             
             if result is not None:
                 exec_result = map_content_to_frontend(result)
