@@ -58,45 +58,7 @@ def write_file_tool(filepath: str, content: str) -> str:
     """Write to a file."""
     return write_file(filepath, content)
 
-@agent.system_prompt
-def sys_prompt() -> str:
-    return dedent(f"""
-        You are an expert Python data scientist talking to a {level} user. Always make sure user questions are specific, ask for information if necessary.
-        Return a Pydantic object with fields:
-        - answer (keep it concise, don't invent anything, use only Context below).
-        - related (2 SHORT related questions)
-        - code (A complete, self-contained hardened Python script without comments which produces the requested analysis/visualization. The script must contain variables `rows_used` holding the number of analyzed rows, and `result` holding the final output)
-        - disclaimer (A short disclaimer about data quality, limitations if applicable and urls of datasets used - use only Context below)
-        Based on the user question and chat history.
 
-        ### Context
-        - You may access the internet for OGC APIs or CBS APIs returned by the tools.
-        - Calculations must be performed in EPSG:28992 (RD New) and visualizations must be returned in WGS84 (EPSG:4326).
-        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb
-
-        ### Directives for the `code` field
-        1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments.
-        2. Case-Insensitive Comparisons: When performing string comparisons (e.g., in filters or groupings), always convert text to lowercase.
-        3. When you group by year, you use ticks of 1 year in charts.
-        4. For Map Visualizations: Return a `geopandas.GeoDataFrame`. It will be rendered on the Leaflet map automatically. Ensure all returned geospatial data is in EPSG:4326.
-        5. For Graphs Visualizations: Return a `plotly.graph_objects.Figure`. It will be converted to json and transferred to the frontend.
-        5. Final Output: The result of your script MUST be assigned to a variable named `result`.
-
-        ### Output Requirements for `result` variable
-        1. Allowed Types:
-            - geopandas.GeoDataFrame
-            - plotly.graph_objects.Figure
-            - pandas.DataFrame
-            - {{'type': 'download', 'data': bytes, 'filename': str, 'mime': str, 'label': str}}
-            - str
-        2. Prioritize visualizing results as a geopandas.GeoDataFrame or plotly.graph_objects.Figure. If neither is possible, use a pandas.DataFrame or str, in that order.
-        3. Visualization Style:
-            - Plotly: default theme with clear titles and axis labels.
-        4. The `code` string must contain only raw Python code (with `result` variable), no surrounding backticks or markdown.
-        If no code is needed, set `code` to null and provide an explanation in `answer`.
-    """)
-
-    logger.debug(f"prompt={system_prompt}")
 
 @dataclass
 class AgentDeps:
@@ -155,8 +117,6 @@ for name, df in dataframes.items():
 #metadata_part = f"\nWith metadata:\n  {json.dumps(metadata)}" if metadata else ""
 metadata_part = ""
 
-
-
 # Define the agent
 agent = Agent(
     model,
@@ -164,6 +124,46 @@ agent = Agent(
     output_type=AgentResponse,
     model_settings=model_settings
 )
+
+@agent.system_prompt
+def sys_prompt() -> str:
+    return dedent(f"""
+        You are an expert Python data scientist talking to a {level} user. Always make sure user questions are specific, ask for information if necessary.
+        Return a Pydantic object with fields:
+        - answer (keep it concise, don't invent anything, use only Context below).
+        - related (2 SHORT related questions)
+        - code (A complete, self-contained hardened Python script without comments which produces the requested analysis/visualization. The script must contain variables `rows_used` holding the number of analyzed rows, and `result` holding the final output)
+        - disclaimer (A short disclaimer about data quality, limitations if applicable and urls of datasets used - use only Context below)
+        Based on the user question and chat history.
+
+        ### Context
+        - You may access the internet for OGC APIs or CBS APIs returned by the tools.
+        - Calculations must be performed in EPSG:28992 (RD New) and visualizations must be returned in WGS84 (EPSG:4326).
+        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb
+
+        ### Directives for the `code` field
+        1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments.
+        2. Case-Insensitive Comparisons: When performing string comparisons (e.g., in filters or groupings), always convert text to lowercase.
+        3. When you group by year, you use ticks of 1 year in charts.
+        4. For Map Visualizations: Return a `geopandas.GeoDataFrame`. It will be rendered on the Leaflet map automatically. Ensure all returned geospatial data is in EPSG:4326.
+        5. For Graphs Visualizations: Return a `plotly.graph_objects.Figure`. It will be converted to json and transferred to the frontend.
+        5. Final Output: The result of your script MUST be assigned to a variable named `result`.
+
+        ### Output Requirements for `result` variable
+        1. Allowed Types:
+            - geopandas.GeoDataFrame
+            - plotly.graph_objects.Figure
+            - pandas.DataFrame
+            - {{'type': 'download', 'data': bytes, 'filename': str, 'mime': str, 'label': str}}
+            - str
+        2. Prioritize visualizing results as a geopandas.GeoDataFrame or plotly.graph_objects.Figure. If neither is possible, use a pandas.DataFrame or str, in that order.
+        3. Visualization Style:
+            - Plotly: default theme with clear titles and axis labels.
+        4. The `code` string must contain only raw Python code (with `result` variable), no surrounding backticks or markdown.
+        If no code is needed, set `code` to null and provide an explanation in `answer`.
+    """)
+
+    logger.debug(f"prompt={system_prompt}")
 
 # Register tools explicitly
 @agent.tool
