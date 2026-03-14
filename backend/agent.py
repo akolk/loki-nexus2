@@ -92,18 +92,17 @@ class AgentResponse(BaseModel):
 # First check openai, then azure openai
 if os.environ.get("OPENAI_API_KEY"):
     model_name_env = os.environ.get("OPENAI_MODEL_NAME", "gpt-5.2")
-    model_name = f'openai:{model_name_env}'
+    model = OpenAIResponsesModel(model_name_env)
 elif os.environ.get("AZURE_OPENAI_API_KEY"):
     deployment_name = os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.2")
-    model_name = f'azure:{deployment_name}'
+    model = OpenAIResponsesModel(deployment_name)
 else:
-    model_name = 'test'
+    model = None
 
-model = OpenAIResponsesModel('gpt-5.2')
-settings = OpenAIResponsesModelSettings(
-    openai_reasoning_effort = os.environ.get("OPENAI_REASONING_EFFORT", "low"),
-    openai_reasoning_summary = os.environ.get("OPENAI_REASONING_SUMMARY", "detailed")
-)
+model_settings = OpenAIResponsesModelSettings(
+    openai_reasoning_effort=os.environ.get("OPENAI_REASONING_EFFORT", "low"),
+    openai_reasoning_summary=os.environ.get("OPENAI_REASONING_SUMMARY", "detailed")
+) if model else None
 
 level = "medior"
 dataframes = {}
@@ -156,11 +155,11 @@ logger.debug(f"prompt={system_prompt}")
 
 # Define the agent
 agent = Agent(
-    model_name,
+    model,
     deps_type=AgentDeps,
     output_type=AgentResponse,
     system_prompt=system_prompt,
-    model_settings=model
+    model_settings=model_settings
 )
 
 # Register tools explicitly
@@ -374,7 +373,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
 
     logger.debug(exec_result)
     # Determine model string for metadata
-    model_name_str = str(model_name)
+    model_name_str = str(model) if model else "test"
 
     # Store the result (ResearchStep)
     step = ResearchStep(

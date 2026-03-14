@@ -1,6 +1,6 @@
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
-from backend.agent import AgentDeps, model_name
+from backend.agent import AgentDeps, model
 from backend.models import ResearchStep
 import os
 import uuid
@@ -32,7 +32,7 @@ async def run_research_agent(query: str, format: str, deps: AgentDeps) -> dict:
     client = AsyncOpenAI()
     try:
         completion = await client.beta.chat.completions.parse(
-            model=model_name,
+            model=str(model) if model else "test",
             messages=messages,
             response_format=ResearchResponse,
         )
@@ -42,7 +42,7 @@ async def run_research_agent(query: str, format: str, deps: AgentDeps) -> dict:
         raise e
 
     # Save step to db
-    model_name_str = str(model_name)
+    model_name_str = str(model) if model else "test"
     step = ResearchStep(
         user_id=deps.user_id,
         query=enriched_query,
