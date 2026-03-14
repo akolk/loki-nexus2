@@ -243,7 +243,7 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
         cmd_parts = deps.mcp_url.split()
         if not cmd_parts:
             # Fallback if command is empty
-            result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets, instructions=get_sysprompt())
+            result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets, instructions=sys_prompt())
             return result.output
 
         server_params = StdioServerParameters(command=cmd_parts[0], args=cmd_parts[1:])
@@ -259,7 +259,7 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
                 return result.output
     else:
         logger.info(toolsets)
-        result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets, instructions=get_sysprompt())
+        result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets, instructions=sys_prompt())
         logger.info(result)
         return result.output
 
