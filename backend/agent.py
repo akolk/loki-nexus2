@@ -3,6 +3,7 @@ import pandas as pd
 import xgboost as xgb
 import sklearn as skl
 import geopandas as gpd
+import polar as pl
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -57,9 +58,7 @@ def read_file_tool(filepath: str) -> str:
 def write_file_tool(filepath: str, content: str) -> str:
     """Write to a file."""
     return write_file(filepath, content)
-
-
-
+    
 @dataclass
 class AgentDeps:
     user_soul: Soul
@@ -110,9 +109,6 @@ settings = OpenAIResponsesModelSettings(
 level = "medior"
 dataframes = {}
 
-dfs_info, ogc_info, cbs_info, wfs_info = "", "", "", ""
-wfs_apis = {}
-
 for name, df in dataframes.items():
     col_info = ", ".join([f"`{col}` ({dtype})" for col, dtype in df.dtypes.items()])
     dfs_info += f"- {name}: {df.shape[0]} rows, {df.shape[1]} columns\n  - Columns: {col_info}\n"
@@ -120,14 +116,6 @@ for name, df in dataframes.items():
 #metadata = get_relevant_metadata(list(dataframes.keys()))
 #metadata_part = f"\nWith metadata:\n  {json.dumps(metadata)}" if metadata else ""
 metadata_part = ""
-
-
-for api in ogc_apis:
-    ogc_info += f"         - {api['url']} : {api['title']}\n"
-for api in cbs_apis:
-    cbs_info += f"         - {api['url']} : {api['displaytitle']}\n"
-for api in wfs_apis:
-    wfs_info += f"         - {api['url']} : {api['displaytitle']}\n"
     
 system_prompt=dedent(f"""
         You are an expert Python data scientist talking to a {level} user. Always make sure user questions are specific, ask for information if necessary.
@@ -141,7 +129,7 @@ system_prompt=dedent(f"""
         ### Context
         - You may access the internet for OGC APIs or CBS APIs returned by the tools.
         - Calculations must be performed in EPSG:28992 (RD New) and visualizations must be returned in WGS84 (EPSG:4326).
-        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb
+        - You may use ONLY the Python Standard Library and provided global variables: np, pd, pl, px, go, gpd, dataframes, sklearn, xgb
 
         ### Directives for the `code` field
         1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments.
@@ -355,7 +343,7 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
     # Execute the generated Python code
-    exec_globals = { "np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl }
+    exec_globals = { "np": np, "pd": pd, "px": px, "pl", pl, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl }
     allowed_globals = set(exec_globals.keys())
     
     exec_result = None
