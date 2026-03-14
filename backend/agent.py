@@ -58,8 +58,6 @@ def write_file_tool(filepath: str, content: str) -> str:
     """Write to a file."""
     return write_file(filepath, content)
 
-
-
 @dataclass
 class AgentDeps:
     user_soul: Soul
@@ -125,7 +123,6 @@ agent = Agent(
     model_settings=model_settings
 )
 
-@agent.system_prompt
 def sys_prompt() -> str:
     return dedent(f"""
         You are an expert Python data scientist talking to a {level} user. Always make sure user questions are specific, ask for information if necessary.
@@ -238,7 +235,7 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
                 mcp_toolset = _create_mcp_toolset(mcp_session, tools.tools)
                 run_toolsets = toolsets + [mcp_toolset]
 
-                result = await agent.run(query, deps=deps, message_history=message_history, toolsets=run_toolsets)
+                result = await agent.run(query, deps=deps, message_history=message_history, toolsets=run_toolsets, instructions=get_sysprompt())
                 return result.output
 
     elif deps.mcp_url and deps.mcp_type == 'STDIO':
@@ -246,7 +243,7 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
         cmd_parts = deps.mcp_url.split()
         if not cmd_parts:
             # Fallback if command is empty
-            result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets)
+            result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets, instructions=get_sysprompt())
             return result.output
 
         server_params = StdioServerParameters(command=cmd_parts[0], args=cmd_parts[1:])
@@ -262,7 +259,7 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
                 return result.output
     else:
         logger.info(toolsets)
-        result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets)
+        result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets, instructions=get_sysprompt())
         logger.info(result)
         return result.output
 
