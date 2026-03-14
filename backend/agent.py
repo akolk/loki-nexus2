@@ -69,6 +69,10 @@ class AgentDeps:
     skill_file: Optional[UploadFile] = None
 
 class AgentResponse(BaseModel):
+    code: Optional[str] = Field(
+        default=None,
+        description="Complete, runnable Python script (no backticks) that assigns the final output to `result`."
+    )
     answer: str = Field( 
         ...,
         description="Short description of the results or why the request cannot be fulfilled."
@@ -77,10 +81,6 @@ class AgentResponse(BaseModel):
         default=None,
         max_length=3,
         description="number of SHORT related follow-up USER questions a USER may ask."
-    )
-    code: Optional[str] = Field(
-        default=None,
-        description="Complete, runnable Python script (no backticks) that assigns the final output to `result`."
     )
     disclaimer: Optional[str] = Field(
         default=None,
@@ -333,6 +333,8 @@ async def run_agent(query: str, deps: AgentDeps) -> dict:
 
     # Run the agent with history and toolsets
     try:
+        logger.info(message_history)
+        logger.info(query)
         agent_response = await _connect_mcp_and_run(query, deps, message_history, toolsets)
         logger.debug(f"agent_response={agent_response}")
     except Exception as e:
