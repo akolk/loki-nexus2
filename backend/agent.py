@@ -159,7 +159,7 @@ agent = Agent(
     model_name,
     deps_type=AgentDeps,
     output_type=AgentResponse,
-    system_prompt=system_prompt
+    system_prompt=system_prompt,
     model_settings=model
 )
 
