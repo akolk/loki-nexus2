@@ -44,3 +44,10 @@ def test_map_content_to_frontend_dict():
 
     assert result["type"] == "html"
     assert result["content"] == "<div>Hello</div>"
+
+def test_map_content_to_frontend_dict_no_type():
+    test_dict = {"foo": "bar"}
+    result = map_content_to_frontend(test_dict)
+
+    assert result["type"] == "json"
+    assert result["content"] == {"foo": "bar"}

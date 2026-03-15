@@ -16,6 +16,9 @@ def _get_plotly_fig():
     except ImportError:
         return ()
 
+POLARS_DF_TYPE = _get_polars_df()
+PLOTLY_FIG_TYPE = _get_plotly_fig()
+
 def map_content_to_frontend(content):
     print(f"MAP_TO_CONTENT: {type(content)}")
     if isinstance(content, gpd.GeoDataFrame):
@@ -31,18 +34,18 @@ def map_content_to_frontend(content):
         html_table = content.to_html(classes="dataframe-table", index=False)
         return {"type": "dataframe", "content": html_table}
 
-    elif isinstance(content, _get_polars_df()):
+    elif isinstance(content, POLARS_DF_TYPE):
         # Convert Polars to Pandas to reuse to_html
         html_table = content.to_pandas().to_html(classes="dataframe-table", index=False)
         return {"type": "dataframe", "content": html_table}
 
-    elif isinstance(content, _get_plotly_fig()):
+    elif isinstance(content, PLOTLY_FIG_TYPE):
         return {"type": "plotly", "content": content.to_json()}
 
     elif isinstance(content, dict):
         if content.get("type") in ["geojson_map", "dataframe", "picture", "html", "plotly", "dict"]:
             return content
-        return {"type": content.get("type"), "content": content}
+        return {"type": content.get("type", "json"), "content": content}
 
     else:
         return {"type": "error", "content": f"Error: unknown datatype {type(content)}."}

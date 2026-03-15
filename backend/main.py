@@ -142,18 +142,19 @@ async def chat_endpoint(
 
         response_text = agent_out["response"]["answer"]
         exec_result = agent_out["exec_result"]
-        related = agent_out["response"].get("related", [])
+        # Explicit spelling to match the frontend contract which expects 'releated'
+        releated = agent_out["response"].get("related", [])
 
         # Ensure we only return up to three related questions
-        if related:
-            related = related[:3]
+        if releated:
+            releated = releated[:3]
 
         # Store model response
         model_msg = ChatHistory(user_id=user.id, role="model", content=response_text)
         session.add(model_msg)
         session.commit()
 
-        return {"response": response_text, "exec_result": exec_result, "related": related}
+        return {"response": response_text, "exec_result": exec_result, "releated": releated}
     except HTTPException:
         raise
     except Exception as e:
