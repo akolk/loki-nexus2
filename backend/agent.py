@@ -105,15 +105,6 @@ model_settings = OpenAIResponsesModelSettings(
 ) if model else None
 
 level = "medior"
-dataframes = {}
-
-for name, df in dataframes.items():
-    col_info = ", ".join([f"`{col}` ({dtype})" for col, dtype in df.dtypes.items()])
-    dfs_info += f"- {name}: {df.shape[0]} rows, {df.shape[1]} columns\n  - Columns: {col_info}\n"
-
-#metadata = get_relevant_metadata(list(dataframes.keys()))
-#metadata_part = f"\nWith metadata:\n  {json.dumps(metadata)}" if metadata else ""
-metadata_part = ""
 
 # Define the agent
 agent = Agent(
@@ -264,11 +255,11 @@ async def _connect_mcp_and_run(query: str, deps: AgentDeps, message_history: Lis
         return result.output
 
 def get_result(exec_globals, allowed_globals):
-    result = copy.deepcopy(exec_globals["result"]) if "result" in exec_globals else None
+    result = exec_globals.get("result")
 
     # Identify keys to delete using set difference for better performance
     keys_to_delete = exec_globals.keys() - allowed_globals
-    for key in keys_to_delete:
+    for key in list(keys_to_delete):
         if not key.startswith("__"):
             del exec_globals[key]
 

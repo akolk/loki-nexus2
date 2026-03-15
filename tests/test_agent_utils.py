@@ -24,9 +24,7 @@ def test_get_result_removes_unallowed_globals():
     assert "px" in exec_globals
     assert "__builtins__" in exec_globals
 
-    # 'result' is copied out and might not be explicitly deleted but let's check what get_result does.
-    # get_result specifically deletes keys NOT in allowed_globals that DO NOT start with "__"
-    # "result" is NOT in allowed_globals, so it should be deleted.
+    # 'result' is returned and deleted if not in allowed_globals.
     assert "result" not in exec_globals
 
     # Check that unallowed globals are removed
