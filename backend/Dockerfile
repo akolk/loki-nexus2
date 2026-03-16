@@ -20,8 +20,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code
-COPY backend/ /app/backend/
-COPY frontend/ /app/frontend/
+COPY . .
 
 # Create workspace directory
 RUN mkdir -p /app/backend/workspace

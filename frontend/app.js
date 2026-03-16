@@ -1,11 +1,24 @@
-const username = "researcher_01";
+let username = "researcher_01";
 const historyDiv = document.getElementById("chat-history");
 const statusDiv = document.getElementById("status");
 const chatHeaderTitle = document.getElementById("chat-header-title");
 
-// Set the header title to "Hallo [username]"
-if (chatHeaderTitle) {
-    chatHeaderTitle.textContent = `Hallo ${username}`;
+async function initUsername() {
+    try {
+        const response = await fetch("/user/info", {
+            headers: { "x-forwarded-user": username }
+        });
+        const userInfo = await response.json();
+        if (userInfo.username) {
+            username = userInfo.username;
+        }
+    } catch (e) {
+        console.warn("Could not fetch user info, using default");
+    }
+    
+    if (chatHeaderTitle) {
+        chatHeaderTitle.textContent = `Hallo ${username}`;
+    }
 }
 
 let isMapMode = false;
@@ -375,6 +388,7 @@ function createPostit(execResult) {
     const header = document.createElement("div");
     header.className = "postit-header";
     header.innerHTML = `
+        <button title="Collapse" onclick="togglePostitCollapse(this.closest('.postit-note')); event.stopPropagation();">▼</button>
         <button title="Pin" onclick="this.closest('.postit-note').classList.toggle('pinned'); event.stopPropagation();">📌</button>
         <button title="Delete" onclick="this.closest('.postit-note').remove(); event.stopPropagation();">✖</button>
     `;
@@ -545,7 +559,64 @@ function recalcMaximizedPostit(postit) {
 }
 
 
-function appendMessage(role, content, execResult=null, related=[]) {
+function openModal(title, content) {
+    const modal = document.getElementById("info-modal");
+    const modalTitle = document.getElementById("modal-title");
+    const modalContent = document.getElementById("modal-content");
+    
+    if (modal && modalTitle && modalContent) {
+        modalTitle.textContent = title;
+        modalContent.textContent = content;
+        modal.style.display = "block";
+    }
+}
+
+function closeModal() {
+    const modal = document.getElementById("info-modal");
+    if (modal) {
+        modal.style.display = "none";
+    }
+}
+
+function togglePostitCollapse(postit) {
+    const btn = postit.querySelector('.postit-header button:first-child');
+    if (postit.classList.contains('collapsed')) {
+        postit.classList.remove('collapsed');
+        if (btn) btn.textContent = '▼';
+        postit.style.right = '';
+        postit.style.left = postit.dataset.origLeft || '';
+        postit.style.top = postit.dataset.origTop || '';
+        postit.style.width = postit.dataset.origWidth || '';
+    } else {
+        postit.dataset.origLeft = postit.style.left;
+        postit.dataset.origTop = postit.style.top;
+        postit.dataset.origWidth = postit.style.width;
+        postit.classList.add('collapsed');
+        if (btn) btn.textContent = '▲';
+        postit.style.left = '';
+        postit.style.top = (window.innerHeight - 50) + 'px';
+        postit.style.right = '10px';
+        postit.style.width = 'auto';
+    }
+}
+
+// Close modal when clicking outside
+document.addEventListener("click", function(e) {
+    const modal = document.getElementById("info-modal");
+    if (modal && modal.style.display === "block" && e.target === modal) {
+        closeModal();
+    }
+});
+
+// Close modal on Escape key
+document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") {
+        closeModal();
+    }
+});
+
+
+function appendMessage(role, content, execResult=null, related=[], extraData={}) {
     const msgDiv = document.createElement("div");
     msgDiv.className = `message ${role}`;
 
@@ -555,7 +626,7 @@ function appendMessage(role, content, execResult=null, related=[]) {
         formattedContent = content.replace(/\n/g, '<br>');
     }
 
-    msgDiv.innerHTML = `<strong>${role}:</strong> <br>${formattedContent}`;
+    msgDiv.innerHTML = `${formattedContent}`;
 
     if (execResult) {
         if (!isMapMode || (execResult.type !== "geojson_map" && execResult.type !== "FeatureCollection")) {
@@ -739,6 +810,69 @@ function appendMessage(role, content, execResult=null, related=[]) {
         msgDiv.appendChild(relatedContainer);
     }
 
+    // Add download button after related questions
+    if (execResult && execResult.type === "download") {
+        const downloadBtn = document.createElement("button");
+        downloadBtn.className = "btn btn-sm btn-primary";
+        downloadBtn.textContent = execResult.label || "Download";
+        downloadBtn.style.marginTop = "10px";
+        
+        const blob = new Blob([execResult.data], { type: execResult.mime || "text/plain" });
+        const url = URL.createObjectURL(blob);
+        downloadBtn.onclick = () => {
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = execResult.filename || "download";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+        
+        msgDiv.appendChild(downloadBtn);
+    }
+
+    // Add action icons for model messages
+    if (role === 'model') {
+        const iconsContainer = document.createElement("div");
+        iconsContainer.className = "message-icons-container";
+        iconsContainer.style.display = "flex";
+        iconsContainer.style.gap = "8px";
+        iconsContainer.style.marginTop = "8px";
+
+        const icons = [
+            { key: 'code', icon: '{ }', title: 'Code', content: extraData.code || 'No code available', color: '#00529B' },
+            { key: 'disclaimer', icon: '!', title: 'Disclaimer', content: extraData.disclaimer || 'No disclaimer', color: '#FF8F00' },
+            { key: 'reasoning', icon: 'R', title: 'Reasoning', content: extraData.reasoning || 'No reasoning available', color: '#00695C' },
+            { key: 'explain', icon: 'i', title: 'Explain', content: 'Explain placeholder: This feature provides additional context about the response.', color: '#00529B' },
+            { key: 'usage', icon: 'U', title: 'Usage', content: 'Usage placeholder: This feature shows how to use the results.', color: '#00529B' }
+        ];
+
+        icons.forEach(item => {
+            const iconBtn = document.createElement("span");
+            iconBtn.innerHTML = item.icon;
+            iconBtn.title = item.title;
+            iconBtn.style.cursor = "pointer";
+            iconBtn.style.fontSize = "0.9em";
+            iconBtn.style.fontWeight = "bold";
+            iconBtn.style.fontFamily = "Arial, sans-serif";
+            iconBtn.style.padding = "2px 6px";
+            iconBtn.style.borderRadius = "4px";
+            iconBtn.style.transition = "background 0.2s, color 0.2s";
+            iconBtn.style.background = item.color + "20";
+            iconBtn.style.color = item.color;
+            iconBtn.style.border = "1px solid " + item.color + "40";
+            
+            iconBtn.onmouseenter = () => { iconBtn.style.background = item.color + "40"; };
+            iconBtn.onmouseleave = () => { iconBtn.style.background = item.color + "20"; };
+            
+            iconBtn.onclick = () => openModal(item.title, item.content);
+            iconsContainer.appendChild(iconBtn);
+        });
+
+        msgDiv.appendChild(iconsContainer);
+    }
+
     historyDiv.appendChild(msgDiv);
     scrollToBottom();
 }
@@ -795,10 +929,15 @@ async function sendMessage() {
         const data = await response.json();
         console.log("Backend response:", data);
         console.log("Exec result type:", data.exec_result ? data.exec_result.type : "none");
+        const extraData = {
+            code: data.code,
+            disclaimer: data.disclaimer,
+            reasoning: data.reasoning
+        };
         if (data.exec_result) {
-            appendMessage("model", data.response, data.exec_result, data.related);
+            appendMessage("model", data.response, data.exec_result, data.related, extraData);
         } else {
-            appendMessage("model", data.response, null, data.related);
+            appendMessage("model", data.response, null, data.related, extraData);
         }
 
     } catch (e) {
@@ -883,10 +1022,15 @@ async function startDeepResearch() {
 
         if (researchStatusDiv) researchStatusDiv.textContent = "Research completed!";
 
+        const extraData = {
+            code: data.code,
+            disclaimer: data.disclaimer,
+            reasoning: data.reasoning
+        };
         if (data.exec_result) {
-            appendMessage("model", data.response, data.exec_result);
+            appendMessage("model", data.response, data.exec_result, data.related, extraData);
         } else {
-            appendMessage("model", data.response);
+            appendMessage("model", data.response, null, data.related, extraData);
         }
     } catch (e) {
         if (researchStatusDiv) researchStatusDiv.textContent = "Error running research.";
@@ -894,6 +1038,7 @@ async function startDeepResearch() {
 }
 
 // Startup
+initUsername();
 loadHistory();
 // Default to closed bubble
 // toggleChat() would open it, so we leave it closed (default HTML state)

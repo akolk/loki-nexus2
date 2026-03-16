@@ -21,10 +21,10 @@
 
         /* Settings Panel Sidebar */
         #settings-sidebar {
-            position: absolute;
+            position: fixed;
             top: 0; left: 0; width: 20%; height: 100%;
             background: white;
-            z-index: 3000; /* Above map and other elements */
+            z-index: 200000;
             box-shadow: 2px 0 5px rgba(0,0,0,0.2);
             display: none; /* Hidden by default */
             flex-direction: column;
@@ -80,7 +80,7 @@
         #chat-widget {
             position: absolute;
             bottom: 20px; left: 20px;
-            z-index: 2000;
+            z-index: 4000;
             display: flex;
             flex-direction: column;
             align-items: flex-start;
@@ -88,18 +88,23 @@
 
         /* Chat Bubble (Default state) */
         #chat-bubble {
-            width: 60px; height: 60px;
-            border-radius: 50%;
-            background: #007bff;
-            color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            font-size: 24px;
-            transition: transform 0.2s;
-            user-select: none;
+            position: fixed !important;
+            bottom: 20px !important;
+            left: 20px !important;
+            width: 80px !important;
+            height: 80px !important;
+            border-radius: 50% !important;
+            background: #00529B !important; /* Kadaster blue */
+            color: white !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            cursor: pointer !important;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5) !important;
+            font-size: 14px !important;
+            font-weight: bold !important;
+            font-family: Arial, sans-serif !important;
+            z-index: 99999 !important;
         }
         #chat-bubble:hover { transform: scale(1.1); }
 
@@ -107,15 +112,16 @@
         #chat-window {
             position: fixed;
             top: 0; left: 0;
-            width: 400px;
-            max-width: 40%;
+            width: 450px;
+            max-width: 45%;
             height: 100vh;
             background: white;
             box-shadow: 4px 0 12px rgba(0,0,0,0.15);
             display: none;
             flex-direction: column;
             border-right: 1px solid #ddd;
-            z-index: 2001; /* Above bubble */
+            z-index: 100000;
+            border-radius: 0 15px 15px 0;
         }
 
         .chat-header {
@@ -137,8 +143,8 @@
         }
 
         .message { padding: 8px 12px; border-radius: 15px; max-width: 80%; font-size: 0.9em; word-wrap: break-word; }
-        .user { background: #e3f2fd; align-self: flex-end; border-bottom-right-radius: 2px; }
-        .model { background: #f1f8e9; align-self: flex-start; border-bottom-left-radius: 2px; }
+        .user { background: #E3F2FD; align-self: flex-end; border-bottom-right-radius: 2px; color: #003366; }
+        .model { background: #FFF9C4; align-self: flex-start; border-bottom-left-radius: 2px; color: #333; }
 
         .related-bubbles-container {
             display: flex;
@@ -149,8 +155,8 @@
 
         .related-bubble {
             background: #fff;
-            color: #007bff;
-            border: 1px solid #007bff;
+            color: #00529B;
+            border: 1px solid #00529B;
             border-radius: 20px;
             padding: 5px 10px;
             font-size: 0.8em;
@@ -162,8 +168,28 @@
         }
 
         .related-bubble:hover {
-            background: #007bff;
+            background: #00529B;
             color: #fff;
+        }
+
+        .message-icons-container {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            padding-top: 4px;
+            border-top: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .message-icons-container span {
+            cursor: pointer;
+            font-size: 0.9em;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .message-icons-container span:hover {
+            background: rgba(0,0,0,0.1);
         }
 
         .chat-footer {
@@ -174,8 +200,8 @@
         }
 
         input[type="text"] { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
-        button { padding: 8px 15px; background: #007bff; color: white; border: none; border-radius: 20px; cursor: pointer; }
-        button:hover { background: #0056b3; }
+        button { padding: 8px 15px; background: #00529B; color: white; border: none; border-radius: 20px; cursor: pointer; }
+        button:hover { background: #003d73; }
 
         /* Job Panel (Moved to settings) */
         .job-panel, .tools-panel, .research-panel {
@@ -210,19 +236,20 @@
         .postit-note {
             position: absolute;
             width: 300px;
-            background: #ffeb3b; /* Classic yellow */
+            background: #E3F2FD; /* Kadaster light blue - like water on maps */
             background-image: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.05) 100%);
             box-shadow: 2px 5px 10px rgba(0,0,0,0.3);
             border-bottom-right-radius: 20px 5px;
             padding: 15px;
             pointer-events: auto; /* Catch clicks */
-            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', sans-serif;
-            color: #333;
+            font-family: 'Arial', sans-serif;
+            color: #003366; /* Kadaster dark blue */
             cursor: move;
             display: flex;
             flex-direction: column;
             transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), left 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), width 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), height 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), border-radius 0.4s ease-in-out;
             box-sizing: border-box;
+            border: 1px solid #B3D4FC;
         }
 
         .postit-note.maximized {
@@ -234,14 +261,17 @@
         }
 
         .postit-note:nth-child(even) {
-            background: #ffc107;
+            background: #FFF9C4; /* Cream/yellow - like old paper documents */
+            border-color: #FFE082;
         }
         .postit-note:nth-child(3n) {
-            background: #8bc34a;
+            background: #E8F5E9; /* Light green - like land/grass on maps */
+            border-color: #C8E6C9;
         }
         .postit-note:nth-child(5n) {
-            background: #03a9f4;
-            color: white;
+            background: #F3E5F5; /* Light purple */
+            border-color: #E1BEE7;
+            color: #4A148C;
         }
 
         /* Draggable Header for Note */
@@ -294,6 +324,17 @@
         .postit-note.pinned {
             z-index: 1000 !important;
             box-shadow: 0 0 10px 2px rgba(255, 0, 0, 0.5);
+        }
+
+        .postit-note.collapsed {
+            min-width: auto;
+            height: auto;
+            border-radius: 20px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .postit-note.collapsed .postit-content {
+            display: none;
         }
 
         /* Post-it Group Container */
@@ -420,6 +461,37 @@
             <button onclick="startDeepResearch()" style="padding: 4px 10px; font-size: 0.8em; width:100%;">Start Research</button>
             <div id="research-status" style="font-size: 0.8em; color: #666; margin-top: 5px; text-align:center;"></div>
         </div>
+
+        <div class="settings-section metadata-panel" id="metadata-section">
+            <h4>Metadata</h4>
+            <div id="metadata-status" style="font-size: 0.8em;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span>PDOK OGC:</span>
+                    <span id="pdok-count">Loading...</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span>CBS:</span>
+                    <span id="cbs-count">Loading...</span>
+                </div>
+                <button onclick="refreshMetadata()" style="padding: 4px 10px; font-size: 0.8em; width:100%;">Refresh</button>
+            </div>
+        </div>
+
+        <div class="settings-section job-panel-admin" id="jobs-admin-section" style="display:none;">
+            <h4>Metadata Jobs (Admin)</h4>
+            <div id="jobs-status" style="font-size: 0.8em;">
+                <div style="margin-bottom: 5px;">
+                    <strong>PDOK Sync:</strong>
+                    <span id="pdok-job-status">-</span>
+                </div>
+                <div style="margin-bottom: 5px;">
+                    <strong>CBS Sync:</strong>
+                    <span id="cbs-job-status">-</span>
+                </div>
+                <button onclick="runMetadataJob(1)" style="padding: 3px 8px; font-size: 0.7em; margin-right: 5px;">Run PDOK</button>
+                <button onclick="runMetadataJob(2)" style="padding: 3px 8px; font-size: 0.7em;">Run CBS</button>
+            </div>
+        </div>
     </div>
 
     <!-- Chat Widget -->
@@ -428,7 +500,7 @@
         <div id="chat-window">
             <div class="chat-header">
                 <div style="display: flex; align-items: center;">
-                    <div id="settings-toggle" onclick="toggleSettings()" onmouseover="openSettings()">&#9776;</div>
+                    <div id="settings-toggle" onclick="toggleSettings()">&#9776;</div>
                     <strong id="chat-header-title">Workspace Agent</strong>
                 </div>
                 <div>
@@ -448,8 +520,19 @@
             </div>
         </div>
 
-        <!-- Chat Bubble -->
-        <div id="chat-bubble" onclick="toggleChat()">💬</div>
+<!-- Chat Bubble -->
+<div id="chat-bubble" onclick="toggleChat()">Chat</div>
+    </div>
+
+    <!-- Modal Popup for Info Display -->
+    <div id="info-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:5000;">
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:white; border-radius:8px; padding:20px; max-width:90%; max-height:90%; width:800px; overflow:auto; box-shadow:0 4px 20px rgba(0,0,0,0.3); border: 2px solid #00529B;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid #00529B; padding-bottom:10px;">
+                <h3 id="modal-title" style="margin:0; color: #00529B;">Title</h3>
+                <button onclick="closeModal()" style="border:none; background:none; font-size:24px; cursor:pointer; color: #00529B;">&times;</button>
+            </div>
+            <div id="modal-content" style="white-space:pre-wrap; font-family:monospace; font-size:0.9em; max-height:70vh; overflow-y:auto;"></div>
+        </div>
     </div>
 
     <!-- Leaflet JS -->

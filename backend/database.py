@@ -25,7 +25,7 @@ SQL_ECHO = os.environ.get("SQL_ECHO", "False").lower() in ("true", "1", "t")
 
 engine = create_engine(DATABASE_URL, echo=SQL_ECHO)
 
-def init_db():
+def init_db() -> None:
     retries = 10
     while retries > 0:
         try:

@@ -1,7 +1,9 @@
 services:
   # Backend Service
   backend:
-    image: ghcr.io/akolk/loki-nexus-backend:${VERSION_BACKEND:-main}
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: loki_nexus_backend
     restart: unless-stopped
     env_file: .env
@@ -13,17 +15,26 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - LOG_LEVEL=info
       - OPENAI_API_VERSION=${OPENAI_API_VERSION:-2023-05-15}
+      - LOKI_METADATA_HOST=lokimetadata
+      - LOKI_METADATA_PORT=5432
+      - LOKI_METADATA_DB=loki_metadata
+      - LOKI_METADATA_USER=postgres
+      - LOKI_METADATA_PASSWORD=postgres
     volumes:
       - ./backend/workspace:/app/backend/workspace
     depends_on:
       db:
+        condition: service_healthy
+      lokimetadata:
         condition: service_healthy
     networks:
       - app-network
 
   # Frontend Service (Nginx + Reverse Proxy)
   frontend:
-    image: ghcr.io/akolk/loki-nexus-frontend:${VERSION:-main}
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
     container_name: loki_nexus_frontend
     restart: unless-stopped
     ports:
@@ -71,8 +82,30 @@ services:
     networks:
       - app-network
 
+  # Metadata Database Service (Postgres + PgVector)
+  lokimetadata:
+    image: ghcr.io/akolk/loki-nexus-db:${VERSION:-main}
+    container_name: loki_nexus_metadata_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=loki_metadata
+    ports:
+      - "5433:5432"
+    volumes:
+      - lokimetadata_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d loki_metadata"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
 volumes:
   postgres_data:
+  lokimetadata_data:
 
 networks:
   app-network:
