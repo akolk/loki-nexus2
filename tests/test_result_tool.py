@@ -44,3 +44,34 @@ def test_map_content_to_frontend_dict():
 
     assert result["type"] == "html"
     assert result["content"] == "<div>Hello</div>"
+
+import unittest.mock
+import sys
+
+def test_missing_optional_dependencies():
+    # Test fallback behavior when dependencies are missing.
+    with unittest.mock.patch.dict('sys.modules', {'polars': None, 'plotly.graph_objects': None}):
+        # We need to reload the module to trigger the ImportError logic
+        # However, since the module is already imported at the top of the test file,
+        # we can just import the logic manually or use importlib.reload.
+        import importlib
+        import backend.tools.result_tool as result_tool
+
+        # Save original just in case
+        original_POLARS_DF_TYPE = result_tool.POLARS_DF_TYPE
+        original_PLOTLY_FIG_TYPE = result_tool.PLOTLY_FIG_TYPE
+
+        importlib.reload(result_tool)
+
+        assert result_tool.POLARS_DF_TYPE == ()
+        assert result_tool.PLOTLY_FIG_TYPE == ()
+
+        # We can also test the map_content_to_frontend doesn't crash on standard dicts
+        # when these types are evaluated as ()
+        test_dict = {"type": "dict", "content": "test data"}
+        res = result_tool.map_content_to_frontend(test_dict)
+        assert res["type"] == "dict"
+
+        # Restore module state
+        result_tool.POLARS_DF_TYPE = original_POLARS_DF_TYPE
+        result_tool.PLOTLY_FIG_TYPE = original_PLOTLY_FIG_TYPE
