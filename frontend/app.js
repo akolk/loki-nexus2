@@ -869,11 +869,14 @@ function appendMessage(role, content, execResult=null, related=[], extraData={})
             { key: 'code', icon: '{ }', title: 'Code', content: extraData.code || 'No code available', color: '#00529B' },
             { key: 'disclaimer', icon: '!', title: 'Disclaimer', content: extraData.disclaimer || 'No disclaimer', color: '#FF8F00' },
             { key: 'reasoning', icon: 'R', title: 'Reasoning', content: extraData.reasoning || 'No reasoning available', color: '#00695C' },
+            { key: 'error', icon: 'X', title: 'Error', content: extraData.error || 'No error', color: '#D32F2F', showOnlyWhenSet: true },
             { key: 'explain', icon: 'i', title: 'Explain', content: 'Explain placeholder: This feature provides additional context about the response.', color: '#00529B' },
             { key: 'usage', icon: 'U', title: 'Usage', content: 'Usage placeholder: This feature shows how to use the results.', color: '#00529B' }
         ];
 
-        icons.forEach(item => {
+        const filteredIcons = icons.filter(icon => !icon.showOnlyWhenSet || (icon.showOnlyWhenSet && extraData[icon.key]));
+
+        filteredIcons.forEach(item => {
             const iconBtn = document.createElement("span");
             iconBtn.innerHTML = item.icon;
             iconBtn.title = item.title;
@@ -957,7 +960,8 @@ async function sendMessage() {
         const extraData = {
             code: data.code,
             disclaimer: data.disclaimer,
-            reasoning: data.reasoning
+            reasoning: data.reasoning,
+            error: data.error
         };
         if (data.exec_result) {
             appendMessage("model", data.response, data.exec_result, data.related, extraData);
@@ -1050,7 +1054,8 @@ async function startDeepResearch() {
         const extraData = {
             code: data.code,
             disclaimer: data.disclaimer,
-            reasoning: data.reasoning
+            reasoning: data.reasoning,
+            error: data.error
         };
         if (data.exec_result) {
             appendMessage("model", data.response, data.exec_result, data.related, extraData);

@@ -208,33 +208,59 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
 
     exec_result: Optional[Dict[str, Any]] = None
     exec_error: Optional[str] = None
+    max_retries = 2
+    retry_count = 0
 
-    try:
-        if agent_response.code:
-            logger.debug(f"Executing generated code:\n{agent_response.code}")
-            exec(agent_response.code, exec_globals)
+    while retry_count <= max_retries:
+        try:
+            if agent_response.code:
+                logger.debug(f"Executing generated code:\n{agent_response.code}")
+                exec(agent_response.code, exec_globals)
 
-            result = get_result(exec_globals, allowed_globals)
+                result = get_result(exec_globals, allowed_globals)
 
-            if result is not None:
-                exec_result = map_content_to_frontend(result)
-                logger.debug(f"exec_result={exec_result}")
+                if result is not None:
+                    exec_result = map_content_to_frontend(result)
+                    logger.debug(f"exec_result={exec_result}")
+                else:
+                    exec_result = {"type": "error", "content": "Agent code executed but did not set the 'result' variable."}
             else:
-                exec_result = {"type": "error", "content": "Agent code executed but did not set the 'result' variable."}
-        else:
-            exec_result = {
-                "type": "answer",
-                "content": {
-                    "answer": agent_response.answer,
-                    "related": agent_response.related or [],
-                    "disclaimer": agent_response.disclaimer,
-                    "code": agent_response.code
+                exec_result = {
+                    "type": "answer",
+                    "content": {
+                        "answer": agent_response.answer,
+                        "related": agent_response.related or [],
+                        "disclaimer": agent_response.disclaimer,
+                        "code": agent_response.code
+                    }
                 }
-            }
-    except Exception as e:
-        logger.error(f"Execution error of generated agent code: {e}", exc_info=True)
-        exec_result = {"type": "error", "content": f"Execution error: {str(e)}"}
-        exec_error = str(e)
+            break
+        except Exception as e:
+            logger.error(f"Execution error of generated agent code: {e}", exc_info=True)
+            exec_error = str(e)
+            
+            if retry_count < max_retries:
+                retry_count += 1
+                logger.info(f"Retrying with error context (attempt {retry_count}/{max_retries})")
+                
+                error_prompt = f"{query}\n\nHerstel fout: {exec_error}\n\nProbeer de code te corrigeren."
+                
+                try:
+                    result = await agent.run(
+                        error_prompt, 
+                        deps=deps, 
+                        message_history=message_history, 
+                        toolsets=toolsets, 
+                        instructions=sys_prompt()
+                    )
+                    agent_response = result.output
+                    exec_globals = {"np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl}
+                except Exception as retry_error:
+                    logger.error(f"Error in retry: {retry_error}")
+                    exec_result = {"type": "error", "content": f"Execution error: {exec_error}"}
+                    break
+            else:
+                exec_result = {"type": "error", "content": f"Execution error: {exec_error}"}
 
     logger.debug(exec_result)
     model_name_str = str(model) if model else "test"
