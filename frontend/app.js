@@ -26,6 +26,22 @@ let map = null;
 let currentGeoJsonLayer = null;
 let currentTileServerLayers = [];
 
+const allNotes = new Set();
+const allGroups = new Set();
+
+function removePostit(element) {
+    allNotes.delete(element);
+    element.remove();
+}
+
+function removeGroup(element) {
+    // If a group is deleted, we remove all notes inside it from state.
+    const notesInside = element.querySelectorAll('.postit-note');
+    notesInside.forEach(n => allNotes.delete(n));
+    allGroups.delete(element);
+    element.remove();
+}
+
 function initMap() {
     if (map) return; // Prevent re-init
 
@@ -109,7 +125,11 @@ function toggleChat() {
 }
 
 window.addEventListener('resize', () => {
-    document.querySelectorAll('.postit-note.maximized').forEach(recalcMaximizedPostit);
+    allNotes.forEach(note => {
+        if (note.classList.contains('maximized')) {
+            recalcMaximizedPostit(note);
+        }
+    });
 });
 
 async function loadHistory() {
@@ -155,7 +175,10 @@ function makeDraggable(element, handle = element) {
         isDragging = true;
 
         // bring to front
-        document.querySelectorAll('.postit-note, .postit-group').forEach(el => {
+        allNotes.forEach(el => {
+            if(!el.classList.contains('pinned') && !el.classList.contains('maximized')) el.style.zIndex = "10";
+        });
+        allGroups.forEach(el => {
             if(!el.classList.contains('pinned') && !el.classList.contains('maximized')) el.style.zIndex = "10";
         });
         if(!element.classList.contains('pinned') && !element.classList.contains('maximized')) element.style.zIndex = "100";
@@ -231,8 +254,8 @@ function makeDraggable(element, handle = element) {
 
         // Handle grouping logic
         if (element.classList.contains('postit-note')) {
-            const groups = Array.from(document.querySelectorAll('.postit-group'));
-            const otherNotes = Array.from(document.querySelectorAll('.postit-note')).filter(n => n !== element && !n.closest('.postit-group'));
+            const groups = Array.from(allGroups);
+            const otherNotes = Array.from(allNotes).filter(n => n !== element && !n.closest('.postit-group'));
 
             const elementRect = element.getBoundingClientRect();
 
@@ -283,7 +306,7 @@ function makeDraggable(element, handle = element) {
                             n.style.position = 'absolute';
                             n.style.transform = n.dataset.rotation ? `rotate(${n.dataset.rotation}deg)` : 'none';
                         });
-                        group.remove();
+                        removeGroup(group);
                     } else {
                         updateGroupStacking(group);
                     }
@@ -350,7 +373,7 @@ function createGroup(notes, left, top) {
         <input type="text" value="New Group">
         <div>
             <button style="border:none;background:none;cursor:pointer;font-size:12px;" onclick="toggleGroupCollapse(this.closest('.postit-group'))">▼</button>
-            <button style="border:none;background:none;cursor:pointer;" onclick="this.closest('.postit-group').remove()">❌</button>
+            <button style="border:none;background:none;cursor:pointer;" onclick="removeGroup(this.closest('.postit-group'))">❌</button>
         </div>
     `;
 
@@ -364,6 +387,7 @@ function createGroup(notes, left, top) {
     groupDiv.appendChild(header);
     groupDiv.appendChild(contentDiv);
     document.getElementById('postit-container').appendChild(groupDiv);
+    allGroups.add(groupDiv);
 
     makeDraggable(groupDiv, header);
 
@@ -390,7 +414,7 @@ function createPostit(execResult) {
     header.innerHTML = `
         <button title="Collapse" onclick="togglePostitCollapse(this.closest('.postit-note')); event.stopPropagation();">▼</button>
         <button title="Pin" onclick="this.closest('.postit-note').classList.toggle('pinned'); event.stopPropagation();">📌</button>
-        <button title="Delete" onclick="this.closest('.postit-note').remove(); event.stopPropagation();">✖</button>
+        <button title="Delete" onclick="removePostit(this.closest('.postit-note')); event.stopPropagation();">✖</button>
     `;
 
     const content = document.createElement("div");
@@ -510,6 +534,7 @@ function createPostit(execResult) {
     };
 
     document.getElementById('postit-container').appendChild(postit);
+    allNotes.add(postit);
 
     makeDraggable(postit);
 }

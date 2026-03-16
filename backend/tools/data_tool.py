@@ -2,6 +2,9 @@ import os
 import re
 import duckdb
 import logging
+import pandas as pd
+import numpy as np
+import pyproj
 from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -53,7 +56,6 @@ class DataTool:
         logger.info(f"Executing query: {sql_query}")
 
         try:
-            import pandas as pd
             # DuckDB executes lazily until fetch
             result = self.con.sql(sql_query)
             # Fetch limited results
@@ -73,10 +75,6 @@ class DataTool:
         """
         Detects EPSG:28992 (RD New) coordinates and transforms them to WGS84 using Pandas vectorization.
         """
-        import pyproj
-        import numpy as np
-
-        import pandas as pd
         if 'x' in df.columns and 'y' in df.columns:
             # Simple heuristic check for RD New bounds
             # Ensure x and y are numeric

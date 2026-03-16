@@ -2,19 +2,18 @@ import geopandas as gpd
 import pandas as pd
 import json
 
-def _get_polars_df():
-    try:
-        import polars as pl
-        return pl.DataFrame
-    except ImportError:
-        return ()
+try:
+    import polars as pl
+    POLARS_DF_TYPE = pl.DataFrame
+except ImportError:
+    POLARS_DF_TYPE = ()
 
-def _get_plotly_fig():
-    try:
-        import plotly.graph_objects as go
-        return go.Figure
-    except ImportError:
-        return ()
+try:
+    import plotly.graph_objects as go
+    PLOTLY_FIG_TYPE = go.Figure
+except ImportError:
+    PLOTLY_FIG_TYPE = ()
+
 
 def map_content_to_frontend(content):
     print(f"MAP_TO_CONTENT: {type(content)}")
@@ -31,12 +30,12 @@ def map_content_to_frontend(content):
         html_table = content.to_html(classes="dataframe-table", index=False)
         return {"type": "dataframe", "content": html_table}
 
-    elif isinstance(content, _get_polars_df()):
+    elif isinstance(content, POLARS_DF_TYPE):
         # Convert Polars to Pandas to reuse to_html
         html_table = content.to_pandas().to_html(classes="dataframe-table", index=False)
         return {"type": "dataframe", "content": html_table}
 
-    elif isinstance(content, _get_plotly_fig()):
+    elif isinstance(content, PLOTLY_FIG_TYPE):
         return {"type": "plotly", "content": content.to_json()}
 
     elif isinstance(content, dict):
