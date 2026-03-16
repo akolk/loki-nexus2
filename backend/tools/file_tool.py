@@ -13,7 +13,7 @@ def _get_safe_path(filepath: str) -> Path:
     safe_path = (WORKSPACE_DIR / filepath).resolve()
 
     # Check if the resolved path is within the workspace directory
-    if not str(safe_path).startswith(str(WORKSPACE_DIR.resolve())):
+    if not safe_path.is_relative_to(WORKSPACE_DIR.resolve()):
         raise ValueError(f"Access denied: {filepath} is outside the workspace.")
 
     return safe_path

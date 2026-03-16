@@ -143,7 +143,7 @@ def add_soul_context(ctx: RunContext[AgentDeps]) -> str:
 
 
 def get_result(exec_globals: Dict[str, Any], allowed_globals: set) -> Any:
-    result = copy.deepcopy(exec_globals["result"]) if "result" in exec_globals else None
+    result = exec_globals.get("result")
 
     keys_to_delete = exec_globals.keys() - allowed_globals
     for key in keys_to_delete:
