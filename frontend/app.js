@@ -653,7 +653,7 @@ function appendMessage(role, content, execResult=null, related=[], extraData={})
 
     msgDiv.innerHTML = `${formattedContent}`;
 
-    if (execResult) {
+    if (execResult && execResult.type && !["answer", "error"].includes(execResult.type)) {
         if (!isMapMode || (execResult.type !== "geojson_map" && execResult.type !== "FeatureCollection")) {
             createPostit(execResult);
         } else {
@@ -909,6 +909,11 @@ function scrollToBottom() {
     if(historyDiv) historyDiv.scrollTop = historyDiv.scrollHeight;
 }
 
+function autoGrow(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
+}
+
 async function sendMessage() {
     const input = document.getElementById("message-input");
     const message = input.value.trim();
@@ -916,6 +921,7 @@ async function sendMessage() {
 
     appendMessage("user", message);
     input.value = "";
+    input.style.height = 'auto';
 
     // Get Bounding Box if in Map Mode
     let bbox = null;

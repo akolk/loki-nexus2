@@ -197,9 +197,26 @@
             border-top: 1px solid #eee;
             display: flex;
             gap: 5px;
+            align-items: flex-end;
         }
 
-        input[type="text"] { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
+        input[type="text"], textarea#message-input { 
+            flex: 1; 
+            padding: 8px 12px; 
+            border: 1px solid #ccc; 
+            border-radius: 20px; 
+            outline: none; 
+            resize: none;
+            overflow: hidden;
+            min-height: 38px;
+            max-height: 150px;
+            font-family: inherit;
+            font-size: inherit;
+            line-height: 1.4;
+        }
+        textarea#message-input {
+            border-radius: 15px;
+        }
         button { padding: 8px 15px; background: #00529B; color: white; border: none; border-radius: 20px; cursor: pointer; }
         button:hover { background: #003d73; }
 
@@ -515,7 +532,7 @@
             </div>
 
             <div class="chat-footer">
-                <input type="text" id="message-input" placeholder="Type a message..." onkeypress="handleKey(event)">
+                <textarea id="message-input" placeholder="Type a message..." onkeypress="handleKey(event)" oninput="autoGrow(this)"></textarea>
                 <button onclick="sendMessage()">Send</button>
             </div>
         </div>

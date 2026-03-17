@@ -1,4 +1,5 @@
 import copy
+import json
 import logging
 import os
 import shutil
@@ -14,7 +15,7 @@ import geopandas as gpd
 import plotly.express as px
 import plotly.graph_objects as go
 from pydantic_ai import Agent, RunContext
-from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
+from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart, SystemPromptPart
 from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
 from pydantic_ai_skills import SkillsDirectory, SkillsToolset
 from sqlmodel import select
@@ -123,24 +124,123 @@ def cbs_api(ctx: RunContext[AgentDeps], cbs_dataset: str, top_k: int = 5) -> str
     logger.info(f"CBS_API: {cbs_dataset}, top_k={top_k}")
     return find_endpoint(cbs_dataset, source_type="cbs", top_k=top_k)
 
+@agent.tool
+def get_soul(ctx: RunContext[AgentDeps]) -> str:
+    """Get the user's soul/memory information.
+    
+    Use this when the user asks what you know about them.
+    """
+    from backend.models import User
+    
+    user = ctx.deps.db_session.get(User, ctx.deps.user_id)
+    logger.info(f"Getting soul for user_id={ctx.deps.user_id}")
+    if not user:
+        return "User not found"
+    
+    soul = user.soul_data or {}
+    style = soul.get("style", "concise")
+    preferences = soul.get("preferences", {})
+    memory = soul.get("memory", "")
+    
+    info = f"""User Profile:
+- Communication Style: {style}
+- Preferences: {preferences}
+- Memory: {memory}"""
+    logger.info(f"Retrieved soul for user {ctx.deps.user_id}: {info}")
+    return info
+
 
 @agent.tool
-def read_file_content(ctx: RunContext[AgentDeps], filepath: str) -> str:
-    """Read the content of a file."""
-    return read_file(filepath)
+async def update_soul(ctx: RunContext[AgentDeps], new_information: str) -> str:
+    """Update the user's soul/memory with new information.
+    
+    Use this when the user explicitly tells you to remember something,
+    change preferences, or update their profile.
+    
+    Args:
+        new_information: What the user wants to remember or change
+    """
+    from openai import AsyncOpenAI
+    from backend.models import User
+    
+    user = ctx.deps.db_session.get(User, ctx.deps.user_id)
+    logger.info(f"Updating soul for user_id={ctx.deps.user_id} with new information: {new_information}")
+    if not user:
+        return "User not found"
+    
+    current_soul = user.soul_data or {}
+    current_preferences = current_soul.get("preferences", {})
+    current_style = current_soul.get("style", "concise")
+    
+    prompt = f"""Current user profile:
+- Communication style: {current_style}
+- Preferences: {current_preferences}
 
+New information from user: {new_information}
 
-@agent.tool
-def write_file_content(ctx: RunContext[AgentDeps], filepath: str, content: str) -> str:
-    """Write content to a file."""
-    return write_file(filepath, content)
+Update the user profile based on the new information. Return a JSON object with:
+- "style": the communication style (keep existing if not mentioned)
+- "preferences": updated preferences dictionary (merge with existing)
+- "memory": any important things to remember about this user or 
+
+Respond only with valid JSON."""
+
+    client = AsyncOpenAI()
+    try:
+        response = await client.chat.completions.create(
+            model="o3-mini",
+            messages=[
+                {"role": "system", "content": "You update user profiles. Return ONLY valid JSON, no markdown, no explanation."},
+                {"role": "user", "content": prompt}
+            ],
+            max_completion_tokens=500
+        )
+        
+        content = response.choices[0].message.content.strip()
+        logger.info
+        
+        if content.startswith("```json"):
+            content = content[7:]
+        elif content.startswith("```"):
+            content = content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+
+        updated_data = json.loads(content.strip())
+        
+        current_preferences.update(updated_data.get("preferences", {}))
+        
+        user.soul_data = {
+            "style": updated_data.get("style", current_style),
+            "preferences": current_preferences,
+            "memory": updated_data.get("memory", "")
+        }
+        logger.info(f"Updated soul for user {ctx.deps.user_id}: {user.soul_data}")
+        
+        ctx.deps.db_session.add(user)
+        ctx.deps.db_session.commit()
+        
+        ctx.deps.user_soul.style = user.soul_data.get("style", "concise")
+        ctx.deps.user_soul.preferences = user.soul_data.get("preferences", {})
+        
+        return f"Soul updated: {user.soul_data}"
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON decode error in update_soul: {e}")
+        return f"Error: LLM returned invalid JSON. Please try again."
+    except Exception as e:
+        logger.error(f"Error updating soul: {e}")
+        return f"Error updating soul: {str(e)}"
 
 
 @agent.system_prompt
 def add_soul_context(ctx: RunContext[AgentDeps]) -> str:
     soul = ctx.deps.user_soul
-    return f"User Preferences: {soul.preferences}. Communication Style: {soul.style}."
-
+    memory = soul.preferences.get("memory", "") if soul.preferences else ""
+    memory_str = f"\nMemory about user: {memory}" if memory else ""
+    logger.debug(f"Adding soul context to system prompt. Style: {soul.style}, Preferences: {soul.preferences}, Memory: {memory}")   
+    userinfo = f"User Preferences: {soul.preferences}. Communication Style: {soul.style}.{memory_str}"
+    return f"{userinfo}\n\n" + sys_prompt()
 
 def get_result(exec_globals: Dict[str, Any], allowed_globals: set) -> Any:
     result = exec_globals.get("result")
@@ -177,6 +277,7 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
             logger.error(f"Failed to load skills: {e}")
 
     statement = select(ChatHistory).where(ChatHistory.user_id == deps.user_id).order_by(ChatHistory.timestamp.desc()).limit(10)
+   
     history_records = deps.db_session.exec(statement).all()
     history_records = list(history_records)[::-1]
 
@@ -187,13 +288,30 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
             message_history.append(ModelRequest(parts=[UserPromptPart(content=record.content)]))
         elif record.role == "model":
             message_history.append(ModelResponse(parts=[TextPart(content=record.content)]))
+    
+    message_history = [
+         m for m in message_history 
+        if not (isinstance(m, ModelRequest) and any(isinstance(p, SystemPromptPart) for p in m.parts))
+    ]
 
     try:
         logger.info(message_history)
         logger.info(query)
-        result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets, instructions=sys_prompt())
+        result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets)
         agent_response = result.output
-        logger.debug(f"agent_response={agent_response}")
+        
+        reasoning = None
+        for msg in result.all_messages():
+            if hasattr(msg, 'parts'):
+                for part in msg.parts:
+                    if hasattr(part, 'thinking') and part.thinking:
+                        reasoning = part.thinking
+                        break
+                    elif hasattr(part, 'content') and isinstance(part.content, str) and 'thinking' in part.content.lower():
+                        reasoning = part.content
+                        break
+        
+        logger.debug(f"agent_response={agent_response}, reasoning={reasoning}")
     except Exception as e:
         logger.error(f"Error executing agent in run_agent: {e}", exc_info=True)
         if tmp_dir:
@@ -210,6 +328,15 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
     exec_error: Optional[str] = None
     max_retries = 2
     retry_count = 0
+
+    non_retryable_errors = [
+        "Name or service not known",
+        "Connection refused",
+        "timeout",
+        "URLError",
+        "ConnectionError",
+        "gaierror"
+    ]
 
     while retry_count <= max_retries:
         try:
@@ -239,13 +366,17 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
             logger.error(f"Execution error of generated agent code: {e}", exc_info=True)
             exec_error = str(e)
             
-            if retry_count < max_retries:
+            is_retryable = not any(err in exec_error for err in non_retryable_errors)
+            
+            if retry_count < max_retries and is_retryable:
                 retry_count += 1
                 logger.info(f"Retrying with error context (attempt {retry_count}/{max_retries})")
                 
-                error_prompt = f"{query}\n\nHerstel fout: {exec_error}\n\nProbeer de code te corrigeren."
+                error_prompt = f"{query}\n\nHerstel fout: {exec_error}\n\nProbeer de code te corrigeren. Let op: geen netwerk calls naar externe URLs."
                 
                 try:
+                    exec_globals = {"np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl}
+                    
                     result = await agent.run(
                         error_prompt, 
                         deps=deps, 
@@ -254,13 +385,15 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
                         instructions=sys_prompt()
                     )
                     agent_response = result.output
-                    exec_globals = {"np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl}
                 except Exception as retry_error:
                     logger.error(f"Error in retry: {retry_error}")
                     exec_result = {"type": "error", "content": f"Execution error: {exec_error}"}
                     break
             else:
+                if not is_retryable:
+                    logger.warning(f"Non-retryable error, stopping: {exec_error}")
                 exec_result = {"type": "error", "content": f"Execution error: {exec_error}"}
+                break
 
     logger.debug(exec_result)
     model_name_str = str(model) if model else "test"
@@ -282,6 +415,7 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
             "related": agent_response.related or [],
             "disclaimer": agent_response.disclaimer,
             "code": agent_response.code,
+            "reasoning": reasoning or agent_response.reasoning,
             "error": exec_error
         },
         "exec_result": exec_result
