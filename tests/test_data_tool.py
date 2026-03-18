@@ -62,3 +62,11 @@ def test_execute_query_lazy_loading():
     results = tool.execute_query("SELECT * FROM large_table")
     # Must enforce lazy limit of 100
     assert len(results) == 100
+
+def test_data_tool_username_directory():
+    # When username is provided, query should replace __PARQUET_DIR__
+    dt = DataTool(username="john_doe")
+    # For testing, we just check if it executed and returned something
+    res = dt.execute_query("SELECT '__PARQUET_DIR__' AS path")
+
+    assert res[0]['path'] == "/data/john_doe/"
