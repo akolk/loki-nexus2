@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Form, File, Header, HTTPException, UploadFile
 from pydantic import BaseModel
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, List
 import json
 import logging
 
@@ -53,7 +53,7 @@ async def chat_endpoint(
     bbox: Optional[str] = Form(None),
     mcp_url: Optional[str] = Form(None),
     mcp_type: Optional[str] = Form(None),
-    skill_file: Optional[UploadFile] = File(None),
+    skill_files: Optional[List[UploadFile]] = File(None),
     user_data: Tuple[User, Soul] = Depends(get_current_user),
     session = Depends(get_session)
 ) -> Dict[str, Any]:
@@ -73,7 +73,7 @@ async def chat_endpoint(
             user_id=user.id,
             mcp_url=mcp_url,
             mcp_type=mcp_type,
-            skill_file=skill_file
+            skill_files=skill_files
         )
 
         final_message = message

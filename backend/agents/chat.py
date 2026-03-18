@@ -71,7 +71,8 @@ def sys_prompt() -> str:
         3. When you group by year, you use ticks of 1 year in charts.
         4. For Map Visualizations: Return a `geopandas.GeoDataFrame`. It will be rendered on the Leaflet map automatically. Ensure all returned geospatial data is in EPSG:4326.
         5. For Graphs Visualizations: Return a `plotly.graph_objects.Figure`. It will be converted to json and transferred to the frontend.
-        5. Final Output: The result of your script MUST be assigned to a variable named `result`.
+        6. Final Output: The result of your script MUST be assigned to a variable named `result`.
+        7. Use URLs and python code returned by tools/skills for data access. 
 
         ### Output Requirements for `result` variable
         1. Allowed Types:
@@ -260,21 +261,34 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
 
     logger.debug(deps)
 
-    if deps.skill_file:
-        tmp_dir = tempfile.mkdtemp()
-        zip_path = os.path.join(tmp_dir, "skills.zip")
-        with open(zip_path, "wb") as f:
-            f.write(deps.skill_file)
-
+    skill_files_list = []
+    if deps.skill_files:
         try:
-            with zipfile.ZipFile(zip_path, "r") as zip_ref:
-                zip_ref.extractall(tmp_dir)
-
-            skills_dir = SkillsDirectory(tmp_dir)
-            skill_toolset = SkillsToolset(skills_dir)
-            toolsets.append(skill_toolset)
+            for sf in deps.skill_files:
+                if hasattr(sf, 'read'):
+                    content = await sf.read()
+                else:
+                    content = sf
+                skill_files_list.append(content)
         except Exception as e:
-            logger.error(f"Failed to load skills: {e}")
+            logger.error(f"Failed to read skill files: {e}")
+
+    if skill_files_list:
+        for idx, skill_content in enumerate(skill_files_list):
+            tmp_dir = tempfile.mkdtemp()
+            zip_path = os.path.join(tmp_dir, f"skills_{idx}.zip")
+            with open(zip_path, "wb") as f:
+                f.write(skill_content)
+
+            try:
+                with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                    zip_ref.extractall(tmp_dir)
+
+                skills_dir = SkillsDirectory(path=tmp_dir)
+                skill_toolset = SkillsToolset(directories=[skills_dir])
+                toolsets.append(skill_toolset)
+            except Exception as e:
+                logger.error(f"Failed to load skills: {e}")
 
     statement = select(ChatHistory).where(ChatHistory.user_id == deps.user_id).order_by(ChatHistory.timestamp.desc()).limit(10)
    
@@ -295,7 +309,7 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
     ]
 
     try:
-        logger.info(message_history)
+        logger.info(toolsets)
         logger.info(query)
         result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets)
         agent_response = result.output

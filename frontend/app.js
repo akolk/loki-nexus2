@@ -938,7 +938,9 @@ async function sendMessage() {
 
     const mcpType = document.getElementById("mcp-type").value;
     const mcpUrl = document.getElementById("mcp-url").value;
-    const skillFile = document.getElementById("skill-file").files[0];
+    const skillFilesInput = document.getElementById("skill-files");
+    const skillFiles = skillFilesInput ? skillFilesInput.files : null;
+    console.log("Skill files:", skillFiles);
 
     const formData = new FormData();
     formData.append("message", message);
@@ -947,8 +949,11 @@ async function sendMessage() {
         formData.append("mcp_type", mcpType);
         formData.append("mcp_url", mcpUrl);
     }
-    if (skillFile) {
-        formData.append("skill_file", skillFile);
+    if (skillFiles && skillFiles.length > 0) {
+        console.log("Appending skill files:", Array.from(skillFiles).map(f => f.name));
+        for (let i = 0; i < skillFiles.length; i++) {
+            formData.append("skill_files", skillFiles[i]);
+        }
     }
 
     try {

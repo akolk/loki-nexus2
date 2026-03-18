@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import Optional, List, Union, Any
 from pydantic import BaseModel, Field
 from sqlmodel import Session
 
@@ -13,7 +13,7 @@ class AgentDeps:
     user_id: int
     mcp_url: Optional[str] = None
     mcp_type: Optional[str] = None
-    skill_file: Optional[str] = None
+    skill_files: Any = None
 
 
 class AgentResponse(BaseModel):
