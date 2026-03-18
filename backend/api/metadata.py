@@ -16,6 +16,45 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/metadata", tags=["metadata"])
 
 
+@router.get("/skills")
+def list_skills() -> Dict[str, Any]:
+    """List loaded skills from the skills directory."""
+    from backend.skills_manager import get_skills_manager
+    
+    manager = get_skills_manager()
+    if not manager:
+        return {"skills_dir": None, "enabled": False, "skills": []}
+    
+    toolsets = manager.get_toolsets()
+    skills = []
+    for ts in toolsets:
+        prefix = getattr(ts, '_prefix', '')
+        skills.append({
+            "prefix": prefix,
+            "toolset_type": type(ts).__name__
+        })
+    
+    return {
+        "skills_dir": manager.skills_dir,
+        "enabled": manager._enabled,
+        "last_refresh": manager._last_refresh,
+        "skills": skills
+    }
+
+
+@router.post("/skills/refresh")
+def refresh_skills() -> Dict[str, str]:
+    """Force refresh skills from the skills directory."""
+    from backend.skills_manager import get_skills_manager
+    
+    manager = get_skills_manager()
+    if not manager:
+        raise HTTPException(status_code=404, detail="Skills manager not initialized")
+    
+    manager.force_refresh()
+    return {"status": "Skills refreshed"}
+
+
 class MetadataJobRequest(BaseModel):
     name: str
     job_type: str = "METADATA_SYNC"

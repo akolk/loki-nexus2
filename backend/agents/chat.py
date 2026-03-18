@@ -17,7 +17,7 @@ import plotly.graph_objects as go
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart, SystemPromptPart
 from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
-from pydantic_ai_skills import SkillsDirectory, SkillsToolset
+from pydantic_ai_skills  import SkillsDirectory, SkillsToolset
 from sqlmodel import select
 from textwrap import dedent
 
@@ -27,7 +27,7 @@ from backend.tools.file_tool import read_file, write_file
 from backend.tools.result_tool import map_content_to_frontend
 
 logger = logging.getLogger(__name__)
-
+skill_toolset = []
 
 if os.environ.get("OPENAI_API_KEY"):
     model_name_env = os.environ.get("OPENAI_MODEL_NAME", "gpt-5.2")
@@ -233,6 +233,17 @@ Respond only with valid JSON."""
         logger.error(f"Error updating soul: {e}")
         return f"Error updating soul: {str(e)}"
 
+# Add skills instructions to agent (includes skill names and descriptions)
+@agent.instructions
+async def add_skills(ctx: RunContext) -> str | None:
+    """Add skills instructions to the agent's context."""
+    if len(skill_toolset ) == 0:
+        logger.info("No skill toolset available, skipping instructions.")
+        return None
+    else:
+        ret = await skill_toolset.get_instructions(ctx)
+        logger.info(f"Adding skills instructions to agent: {ret}")
+        return ret
 
 @agent.system_prompt
 def add_soul_context(ctx: RunContext[AgentDeps]) -> str:
@@ -261,6 +272,10 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
 
     logger.debug(deps)
 
+    from backend.skills_manager import get_skills_toolsets
+    directory_toolsets = get_skills_toolsets()
+    toolsets.extend(directory_toolsets)
+
     skill_files_list = []
     if deps.skill_files:
         try:
@@ -274,21 +289,24 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
             logger.error(f"Failed to read skill files: {e}")
 
     if skill_files_list:
+        from pydantic_ai.toolsets import PrefixedToolset
+        
         for idx, skill_content in enumerate(skill_files_list):
             tmp_dir = tempfile.mkdtemp()
             zip_path = os.path.join(tmp_dir, f"skills_{idx}.zip")
             with open(zip_path, "wb") as f:
                 f.write(skill_content)
 
-            try:
-                with zipfile.ZipFile(zip_path, "r") as zip_ref:
-                    zip_ref.extractall(tmp_dir)
+        try:
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                zip_ref.extractall(tmp_dir)
 
-                skills_dir = SkillsDirectory(path=tmp_dir)
-                skill_toolset = SkillsToolset(directories=[skills_dir])
-                toolsets.append(skill_toolset)
-            except Exception as e:
-                logger.error(f"Failed to load skills: {e}")
+            skills_dir = SkillsDirectory(path=tmp_dir)
+            skill_toolset = SkillsToolset(directories=[skills_dir])
+            #prefixed_toolset = PrefixedToolset(skill_toolset, prefix=f"skill{idx}_")
+            toolsets.append(skill_toolset)
+        except Exception as e:
+            logger.error(f"Failed to load skills: {e}")
 
     statement = select(ChatHistory).where(ChatHistory.user_id == deps.user_id).order_by(ChatHistory.timestamp.desc()).limit(10)
    

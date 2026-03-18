@@ -72,6 +72,13 @@ async def lifespan(app: FastAPI):
     start_scheduler()
     
     try:
+        from backend.skills_manager import init_skills_manager
+        skills_refresh = int(os.environ.get("SKILLS_REFRESH_INTERVAL", "300"))
+        init_skills_manager(refresh_interval=skills_refresh)
+    except Exception as e:
+        logger.warning(f"Could not initialize skills manager: {e}")
+    
+    try:
         create_metadata_tables()
     except Exception as e:
         logger.warning(f"Could not initialize metadata DB: {e}")
