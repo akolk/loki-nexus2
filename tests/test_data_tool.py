@@ -62,3 +62,8 @@ def test_execute_query_lazy_loading():
     results = tool.execute_query("SELECT * FROM large_table")
     # Must enforce lazy limit of 100
     assert len(results) == 100
+
+def test_data_tool_transformer_caching():
+    tool = DataTool()
+    assert hasattr(tool, '_transformer')
+    assert tool._transformer is not None
