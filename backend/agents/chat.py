@@ -17,14 +17,13 @@ import plotly.graph_objects as go
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart, SystemPromptPart
 from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
-from pydantic_ai_skills  import SkillsDirectory, SkillsToolset
 from sqlmodel import select
 from textwrap import dedent
 
 from backend.agents.base import AgentDeps, AgentResponse
 from backend.models import ChatHistory, ResearchStep
-from backend.tools.file_tool import read_file, write_file
 from backend.tools.result_tool import map_content_to_frontend
+from backend.skills_manager import get_skills_toolsets
 
 logger = logging.getLogger(__name__)
 skill_toolset = []
@@ -237,22 +236,68 @@ Respond only with valid JSON."""
 @agent.instructions
 async def add_skills(ctx: RunContext) -> str | None:
     """Add skills instructions to the agent's context."""
-    if len(skill_toolset ) == 0:
-        logger.info("No skill toolset available, skipping instructions.")
+    toolsets = get_skills_toolsets()
+    if not toolsets:
+        logger.warning("No toolsets available for skills instructions")
         return None
-    else:
-        ret = await skill_toolset.get_instructions(ctx)
-        logger.info(f"Adding skills instructions to agent: {ret}")
-        return ret
+    
+    instructions_parts = []
+    for toolset in toolsets:
+        try:
+            instr = await toolset.get_instructions(ctx)
+            if instr:
+                logger.info(f"Got instructions from toolset: {len(instr)} chars")
+                instructions_parts.append(instr)
+            else:
+                logger.warning("Toolset returned empty instructions")
+        except Exception as e:
+            logger.warning(f"Failed to get instructions from toolset: {e}")
+    
+    result = "\n\n".join(instructions_parts) if instructions_parts else None
+    logger.info(f"Total skills instructions: {len(result) if result else 0} chars")
+    return result
 
-@agent.system_prompt
-def add_soul_context(ctx: RunContext[AgentDeps]) -> str:
-    soul = ctx.deps.user_soul
+def build_system_prompt(ctx: AgentDeps, toolsets: List = None) -> str:
+    """Build the complete system prompt including skills."""
+    soul = ctx.user_soul
     memory = soul.preferences.get("memory", "") if soul.preferences else ""
     memory_str = f"\nMemory about user: {memory}" if memory else ""
-    logger.debug(f"Adding soul context to system prompt. Style: {soul.style}, Preferences: {soul.preferences}, Memory: {memory}")   
     userinfo = f"User Preferences: {soul.preferences}. Communication Style: {soul.style}.{memory_str}"
-    return f"{userinfo}\n\n" + sys_prompt()
+    
+    skills_text = ""
+    if toolsets:
+        skills_parts = []
+        for ts in toolsets:
+            skills_parts.append(f"<!-- Skill: {type(ts).__name__} -->")
+        if skills_parts:
+            skills_text = "\n\n" + "\n\n".join(skills_parts)
+    
+    return f"{userinfo}\n\n" + sys_prompt() + skills_text
+
+
+async def build_system_prompt_async(ctx: AgentDeps, toolsets: List = None) -> str:
+    """Build the complete system prompt including skills (async version)."""
+    soul = ctx.user_soul
+    memory = soul.preferences.get("memory", "") if soul.preferences else ""
+    memory_str = f"\nMemory about user: {memory}" if memory else ""
+    userinfo = f"User Preferences: {soul.preferences}. Communication Style: {soul.style}.{memory_str}"
+    
+    skills_text = ""
+    if toolsets:
+        skills_parts = []
+        for ts in toolsets:
+            try:
+                # Get the full skill content directly
+                if hasattr(ts, 'skills'):
+                    for skill_name, skill_obj in ts.skills.items():
+                        if hasattr(skill_obj, 'content') and skill_obj.content:
+                            skills_parts.append(f"=== {skill_name.upper()} SKILL ===\n{skill_obj.content}")
+            except Exception as e:
+                logger.warning(f"Failed to get skill content: {e}")
+        if skills_parts:
+            skills_text = "\n\n" + "\n\n".join(skills_parts)
+    
+    return f"{userinfo}\n\n" + sys_prompt() + skills_text
 
 def get_result(exec_globals: Dict[str, Any], allowed_globals: set) -> Any:
     result = exec_globals.get("result")
@@ -268,45 +313,10 @@ def get_result(exec_globals: Dict[str, Any], allowed_globals: set) -> Any:
 async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
     """Runs the agent and stores the result in the DB."""
     toolsets: List[Any] = []
-    tmp_dir: Optional[str] = None
 
     logger.debug(deps)
 
-    from backend.skills_manager import get_skills_toolsets
-    directory_toolsets = get_skills_toolsets()
-    toolsets.extend(directory_toolsets)
-
-    skill_files_list = []
-    if deps.skill_files:
-        try:
-            for sf in deps.skill_files:
-                if hasattr(sf, 'read'):
-                    content = await sf.read()
-                else:
-                    content = sf
-                skill_files_list.append(content)
-        except Exception as e:
-            logger.error(f"Failed to read skill files: {e}")
-
-    if skill_files_list:
-        from pydantic_ai.toolsets import PrefixedToolset
-        
-        for idx, skill_content in enumerate(skill_files_list):
-            tmp_dir = tempfile.mkdtemp()
-            zip_path = os.path.join(tmp_dir, f"skills_{idx}.zip")
-            with open(zip_path, "wb") as f:
-                f.write(skill_content)
-
-        try:
-            with zipfile.ZipFile(zip_path, "r") as zip_ref:
-                zip_ref.extractall(tmp_dir)
-
-            skills_dir = SkillsDirectory(path=tmp_dir)
-            skill_toolset = SkillsToolset(directories=[skills_dir])
-            #prefixed_toolset = PrefixedToolset(skill_toolset, prefix=f"skill{idx}_")
-            toolsets.append(skill_toolset)
-        except Exception as e:
-            logger.error(f"Failed to load skills: {e}")
+    toolsets.extend(get_skills_toolsets())
 
     statement = select(ChatHistory).where(ChatHistory.user_id == deps.user_id).order_by(ChatHistory.timestamp.desc()).limit(10)
    
@@ -327,9 +337,8 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
     ]
 
     try:
-        logger.info(toolsets)
-        logger.info(query)
-        result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets)
+        system_prompt = await build_system_prompt_async(deps, toolsets)
+        result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets, instructions=system_prompt)
         agent_response = result.output
         
         reasoning = None
@@ -346,12 +355,7 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
         logger.debug(f"agent_response={agent_response}, reasoning={reasoning}")
     except Exception as e:
         logger.error(f"Error executing agent in run_agent: {e}", exc_info=True)
-        if tmp_dir:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
         raise e
-
-    if tmp_dir:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
 
     exec_globals = {"np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl}
     allowed_globals = set(exec_globals.keys())
@@ -404,17 +408,18 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
                 retry_count += 1
                 logger.info(f"Retrying with error context (attempt {retry_count}/{max_retries})")
                 
-                error_prompt = f"{query}\n\nHerstel fout: {exec_error}\n\nProbeer de code te corrigeren. Let op: geen netwerk calls naar externe URLs."
+                error_prompt = f"{query}\n\nHerstel fout: {exec_error}\n\nProbeer de code te corrigeren."
                 
                 try:
                     exec_globals = {"np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl}
+                    system_prompt = await build_system_prompt_async(deps, toolsets)
                     
                     result = await agent.run(
                         error_prompt, 
                         deps=deps, 
                         message_history=message_history, 
                         toolsets=toolsets, 
-                        instructions=sys_prompt()
+                        instructions=system_prompt
                     )
                     agent_response = result.output
                 except Exception as retry_error:

@@ -1,13 +1,10 @@
 import logging
 import os
 import time
-import zipfile
-import tempfile
 from typing import List, Optional
 from threading import Lock
 
 from pydantic_ai_skills import SkillsDirectory, SkillsToolset
-from pydantic_ai.toolsets.prefixed import PrefixedToolset
 from pydantic_ai.toolsets.combined import AbstractToolset
 
 logger = logging.getLogger(__name__)
@@ -31,7 +28,9 @@ class SkillsManager:
             logger.warning(f"Skills directory not found: {skills_dir}")
     
     def _load_skills(self) -> None:
-        """Load all skills from the skills directory."""
+        """Load all skills from subdirectories into a single SkillsToolset."""
+        from pydantic_ai_skills import SkillsDirectory, SkillsToolset
+        
         with self._lock:
             self._toolsets = []
             
@@ -39,40 +38,25 @@ class SkillsManager:
                 logger.warning(f"Skills directory does not exist: {self.skills_dir}")
                 return
             
-            skill_files = []
+            skill_dirs = []
             for entry in os.listdir(self.skills_dir):
-                full_path = os.path.join(self.skills_dir, entry)
-                
                 if entry.startswith("."):
                     continue
                 
-                if os.path.isdir(full_path):
-                    skill_files.append(("dir", full_path, entry))
-                elif entry.endswith((".zip", ".skill")):
-                    skill_files.append(("file", full_path, entry))
+                full_path = os.path.join(self.skills_dir, entry)
+                
+                if not os.path.isdir(full_path):
+                    continue
+                
+                skill_dirs.append(SkillsDirectory(path=full_path))
+                logger.info(f"Found skill: {entry}")
             
-            for idx, (skill_type, path, name) in enumerate(skill_files):
-                try:
-                    if skill_type == "dir":
-                        skills_dir_obj = SkillsDirectory(path=path)
-                        toolset = SkillsToolset(directories=[skills_dir_obj])
-                    else:
-                        import zipfile
-                        import tempfile
-                        tmp_dir = tempfile.mkdtemp()
-                        with zipfile.ZipFile(path, "r") as zf:
-                            zf.extractall(tmp_dir)
-                        skills_dir_obj = SkillsDirectory(path=tmp_dir)
-                        toolset = SkillsToolset(directories=[skills_dir_obj])
-                    
-                    prefixed = PrefixedToolset(toolset, prefix=f"skill{idx}_")
-                    self._toolsets.append(prefixed)
-                    logger.info(f"Loaded skill: {name}")
-                except Exception as e:
-                    logger.error(f"Failed to load skill {name}: {e}")
+            if skill_dirs:
+                toolset = SkillsToolset(directories=skill_dirs)
+                self._toolsets.append(toolset)
+                logger.info(f"Loaded {len(skill_dirs)} skills in single toolset")
             
             self._last_refresh = time.time()
-            logger.info(f"Loaded {len(self._toolsets)} skill toolsets")
     
     def should_refresh(self) -> bool:
         """Check if skills should be refreshed."""
@@ -101,7 +85,7 @@ class SkillsManager:
 _skills_manager: Optional[SkillsManager] = None
 
 
-def init_skills_manager(skills_dir: str = None, refresh_interval: int = 300) -> SkillsManager:
+def init_skills_manager(skills_dir: Optional[str] = None, refresh_interval: int = 300) -> SkillsManager:
     """Initialize the global skills manager."""
     global _skills_manager
     if skills_dir is None:
