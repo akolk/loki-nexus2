@@ -197,7 +197,7 @@ Respond only with valid JSON."""
         )
         
         content = response.choices[0].message.content.strip()
-        logger.info
+        logger.info(f"LLM soul update raw response: {content}")
         
         if content.startswith("```json"):
             content = content[7:]

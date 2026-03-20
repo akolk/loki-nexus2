@@ -12,10 +12,20 @@ from unittest.mock import patch, MagicMock
 client = TestClient(app)
 
 # Patch the run_agent function to avoid real agent execution/API calls
-@patch("backend.main.run_agent")
+@patch("backend.api.chat.run_agent")
 def test_chat_flow(mock_run_agent):
     # Setup mock
-    mock_run_agent.return_value = {"response": {"answer": "Mocked Agent Response"}, "exec_result": None}
+    mock_run_agent.return_value = {
+        "response": {
+            "answer": "Mocked Agent Response",
+            "related": [],
+            "disclaimer": "",
+            "code": "",
+            "error": "Geen fouten tijdens ophalen van antwoord.",
+            "reasoning": None
+        },
+        "exec_result": None
+    }
 
     # Setup DB
     init_db()
@@ -51,8 +61,18 @@ def test_chat_flow(mock_run_agent):
 def test_job_scheduling():
     # Ensure user exists first (re-using client state if persistent, but safe to re-init)
     # We need to mock run_agent here too implicitly because /chat calls it
-    with patch("backend.main.run_agent") as mock_run:
-        mock_run.return_value = {"response": {"answer": "ack"}, "exec_result": None}
+    with patch("backend.api.chat.run_agent") as mock_run:
+        mock_run.return_value = {
+            "response": {
+                "answer": "ack",
+                "related": [],
+                "disclaimer": "",
+                "code": "",
+                "error": "Geen fouten tijdens ophalen van antwoord.",
+                "reasoning": None
+            },
+            "exec_result": None
+        }
         client.post(
             "/chat",
             data={"message": "Init user"},
