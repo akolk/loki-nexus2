@@ -10,3 +10,4 @@ __pycache__/
 venv/
 .coverage
 backend/workspace/test_write.txt
+test-env/
