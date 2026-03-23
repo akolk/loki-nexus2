@@ -12,7 +12,7 @@ from unittest.mock import patch, MagicMock
 client = TestClient(app)
 
 # Patch the run_agent function to avoid real agent execution/API calls
-@patch("backend.main.run_agent")
+@patch("backend.api.chat.run_agent")
 def test_chat_flow(mock_run_agent):
     # Setup mock
     mock_run_agent.return_value = {"response": {"answer": "Mocked Agent Response"}, "exec_result": None}
@@ -51,7 +51,7 @@ def test_chat_flow(mock_run_agent):
 def test_job_scheduling():
     # Ensure user exists first (re-using client state if persistent, but safe to re-init)
     # We need to mock run_agent here too implicitly because /chat calls it
-    with patch("backend.main.run_agent") as mock_run:
+    with patch("backend.api.chat.run_agent") as mock_run:
         mock_run.return_value = {"response": {"answer": "ack"}, "exec_result": None}
         client.post(
             "/chat",
@@ -68,7 +68,41 @@ def test_job_scheduling():
     assert response.status_code == 200
     assert response.json()["status"] == "Job scheduled"
 
+@patch("backend.api.chat.run_agent")
+def test_delete_history(mock_run_agent):
+    # Setup mock
+    mock_run_agent.return_value = {"response": {"answer": "Mocked Agent Response"}, "exec_result": None}
+
+    # Setup DB
+    init_db()
+
+    # 1. Send a chat message
+    response = client.post(
+        "/chat",
+        data={"message": "Hello Agent"},
+        headers={"x-forwarded-user": "delete_history_user"}
+    )
+    assert response.status_code == 200
+
+    # 2. Get history to verify it exists
+    response = client.get("/history", headers={"x-forwarded-user": "delete_history_user"})
+    assert response.status_code == 200
+    history = response.json()
+    assert len(history) >= 2
+
+    # 3. Delete history
+    response = client.delete("/history", headers={"x-forwarded-user": "delete_history_user"})
+    assert response.status_code == 200
+    assert response.json() == {"status": "History deleted"}
+
+    # 4. Get history again to verify it is empty
+    response = client.get("/history", headers={"x-forwarded-user": "delete_history_user"})
+    assert response.status_code == 200
+    history = response.json()
+    assert len(history) == 0
+
 if __name__ == "__main__":
     test_chat_flow()
     test_job_scheduling()
+    test_delete_history()
     print("API Tests Passed.")
