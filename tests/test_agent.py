@@ -1,5 +1,7 @@
 import pytest
-from backend.agent import read_file_tool, write_file_tool, run_data_query_tool, AgentDeps
+from backend.tools.file_tool import read_file as read_file_tool, write_file as write_file_tool
+from backend.tools.data_tool import run_data_query as run_data_query_tool
+from backend.agents.base import AgentDeps
 from backend.models import Soul
 import os
 

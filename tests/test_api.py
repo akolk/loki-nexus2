@@ -8,17 +8,30 @@ import pytest
 import os
 from unittest.mock import patch, MagicMock
 
+from sqlmodel import delete
+from backend.models import User, ChatHistory
+
 # Override dependency or env if needed, but TestClient works well with app
 client = TestClient(app)
 
+@pytest.fixture(scope='module', autouse=True)
+def setup_database():
+    init_db()
+    with Session(engine) as session:
+        session.exec(delete(ChatHistory))
+        session.exec(delete(User))
+        session.commit()
+    yield
+    with Session(engine) as session:
+        session.exec(delete(ChatHistory))
+        session.exec(delete(User))
+        session.commit()
+
 # Patch the run_agent function to avoid real agent execution/API calls
-@patch("backend.main.run_agent")
+@patch("backend.api.chat.run_agent")
 def test_chat_flow(mock_run_agent):
     # Setup mock
     mock_run_agent.return_value = {"response": {"answer": "Mocked Agent Response"}, "exec_result": None}
-
-    # Setup DB
-    init_db()
 
     # 1. Send a chat message
     response = client.post(
@@ -51,7 +64,7 @@ def test_chat_flow(mock_run_agent):
 def test_job_scheduling():
     # Ensure user exists first (re-using client state if persistent, but safe to re-init)
     # We need to mock run_agent here too implicitly because /chat calls it
-    with patch("backend.main.run_agent") as mock_run:
+    with patch("backend.api.chat.run_agent") as mock_run:
         mock_run.return_value = {"response": {"answer": "ack"}, "exec_result": None}
         client.post(
             "/chat",
