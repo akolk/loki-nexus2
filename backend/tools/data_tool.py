@@ -24,6 +24,8 @@ class DataTool:
         # Install spatial extension if possible (might not work in all envs without internet/pre-install)
         # We skip this for now as it's complex to setup in sandboxed envs.
         # We rely on pure python projection via pyproj.
+        # Cache the PyProj transformer to optimize transformations
+        self.transformer = pyproj.Transformer.from_crs("EPSG:28992", "EPSG:4326", always_xy=True)
 
     def __del__(self):
         try:
@@ -84,11 +86,10 @@ class DataTool:
             mask = (x_num > 0) & (x_num < 300000) & (y_num > 300000) & (y_num < 650000)
 
             if mask.any():
-                transformer = pyproj.Transformer.from_crs("EPSG:28992", "EPSG:4326", always_xy=True)
                 # Apply transformation only on valid rows
                 # NOTE: EPSG:4326 is lon/lat order when always_xy=True
                 # transformer.transform with always_xy=True returns (lon, lat)
-                lon, lat = transformer.transform(x_num[mask].values, y_num[mask].values)
+                lon, lat = self.transformer.transform(x_num[mask].values, y_num[mask].values)
 
                 # Initialize columns if they don't exist
                 if 'wgs84_lon' not in df.columns:
