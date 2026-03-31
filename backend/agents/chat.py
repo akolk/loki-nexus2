@@ -38,8 +38,6 @@ else:
     model = None
 
 model_settings = OpenAIResponsesModelSettings(
-    openai_reasoning_effort=os.environ.get("OPENAI_REASONING_EFFORT", "low"),
-    openai_reasoning_summary=os.environ.get("OPENAI_REASONING_SUMMARY", "auto"),
     max_tokens=int(os.environ.get("OPENAI_MAX_TOKENS", "50000")),
     model_config={
         "max_retries": int(os.environ.get("OPENAI_MAX_RETRIES", "3"))
@@ -339,7 +337,7 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
     try:
         system_prompt = await build_system_prompt_async(deps, toolsets)
         result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets, instructions=system_prompt)
-        agent_response = result.output
+        agent_response = getattr(result, 'data', getattr(result, 'output', None))
         
         reasoning = None
         for msg in result.all_messages():
@@ -421,7 +419,7 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
                         toolsets=toolsets, 
                         instructions=system_prompt
                     )
-                    agent_response = result.output
+                    agent_response = getattr(result, 'data', getattr(result, 'output', None))
                 except Exception as retry_error:
                     logger.error(f"Error in retry: {retry_error}")
                     exec_result = {"type": "error", "content": f"Execution error: {exec_error}"}
