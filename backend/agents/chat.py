@@ -38,8 +38,6 @@ else:
     model = None
 
 model_settings = OpenAIResponsesModelSettings(
-    openai_reasoning_effort=os.environ.get("OPENAI_REASONING_EFFORT", "low"),
-    openai_reasoning_summary=os.environ.get("OPENAI_REASONING_SUMMARY", "auto"),
     max_tokens=int(os.environ.get("OPENAI_MAX_TOKENS", "50000")),
     model_config={
         "max_retries": int(os.environ.get("OPENAI_MAX_RETRIES", "3"))
