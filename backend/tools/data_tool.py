@@ -24,6 +24,7 @@ class DataTool:
         # Install spatial extension if possible (might not work in all envs without internet/pre-install)
         # We skip this for now as it's complex to setup in sandboxed envs.
         # We rely on pure python projection via pyproj.
+        self.transformer = pyproj.Transformer.from_crs("EPSG:28992", "EPSG:4326", always_xy=True)
 
     def __del__(self):
         try:
@@ -75,29 +76,30 @@ class DataTool:
         """
         Detects EPSG:28992 (RD New) coordinates and transforms them to WGS84 using Pandas vectorization.
         """
-        if 'x' in df.columns and 'y' in df.columns:
-            # Simple heuristic check for RD New bounds
-            # Ensure x and y are numeric
-            x_num = pd.to_numeric(df['x'], errors='coerce')
-            y_num = pd.to_numeric(df['y'], errors='coerce')
+        if 'x' not in df.columns or 'y' not in df.columns:
+            return df
 
-            mask = (x_num > 0) & (x_num < 300000) & (y_num > 300000) & (y_num < 650000)
+        # Simple heuristic check for RD New bounds
+        # Ensure x and y are numeric
+        x_num = pd.to_numeric(df['x'], errors='coerce')
+        y_num = pd.to_numeric(df['y'], errors='coerce')
 
-            if mask.any():
-                transformer = pyproj.Transformer.from_crs("EPSG:28992", "EPSG:4326", always_xy=True)
-                # Apply transformation only on valid rows
-                # NOTE: EPSG:4326 is lon/lat order when always_xy=True
-                # transformer.transform with always_xy=True returns (lon, lat)
-                lon, lat = transformer.transform(x_num[mask].values, y_num[mask].values)
+        mask = (x_num > 0) & (x_num < 300000) & (y_num > 300000) & (y_num < 650000)
 
-                # Initialize columns if they don't exist
-                if 'wgs84_lon' not in df.columns:
-                    df['wgs84_lon'] = np.nan
-                if 'wgs84_lat' not in df.columns:
-                    df['wgs84_lat'] = np.nan
+        if mask.any():
+            # Apply transformation only on valid rows
+            # NOTE: EPSG:4326 is lon/lat order when always_xy=True
+            # transformer.transform with always_xy=True returns (lon, lat)
+            lon, lat = self.transformer.transform(x_num[mask].values, y_num[mask].values)
 
-                df.loc[mask, 'wgs84_lon'] = lon
-                df.loc[mask, 'wgs84_lat'] = lat
+            # Initialize columns if they don't exist
+            if 'wgs84_lon' not in df.columns:
+                df['wgs84_lon'] = np.nan
+            if 'wgs84_lat' not in df.columns:
+                df['wgs84_lat'] = np.nan
+
+            df.loc[mask, 'wgs84_lon'] = lon
+            df.loc[mask, 'wgs84_lat'] = lat
 
         return df
 
