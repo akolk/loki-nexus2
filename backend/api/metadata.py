@@ -49,10 +49,10 @@ def refresh_skills() -> Dict[str, str]:
     
     manager = get_skills_manager()
     if not manager:
-        raise HTTPException(status_code=404, detail="Skills manager not initialized")
+        raise HTTPException(status_code=400, detail="Skills manager not initialized")
     
     manager.force_refresh()
-    return {"status": "Skills refreshed"}
+    return {"status": "success", "message": "Skills reloaded successfully"}
 
 
 class MetadataJobRequest(BaseModel):
