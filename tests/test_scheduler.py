@@ -6,7 +6,7 @@ from backend.models import User
 from sqlmodel import Session, SQLModel, create_engine
 
 # Use an in-memory SQLite database for testing
-engine = create_engine("sqlite:///:memory:")
+engine = create_engine("sqlite:///:memory:", connect_args={'check_same_thread': False})
 SQLModel.metadata.create_all(engine)
 
 @pytest.fixture
