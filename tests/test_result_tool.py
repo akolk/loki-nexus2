@@ -44,3 +44,29 @@ def test_map_content_to_frontend_dict():
 
     assert result["type"] == "html"
     assert result["content"] == "<div>Hello</div>"
+
+def test_map_content_to_frontend_geodataframe_no_crs():
+    # Create a GeoDataFrame without explicit CRS
+    df = pd.DataFrame(
+        {'City': ['Amersfoort'],
+         'x': [155000],
+         'y': [463000]}
+    )
+    gdf = gpd.GeoDataFrame(
+        df, geometry=gpd.points_from_xy(df.x, df.y)
+    )
+
+    assert gdf.crs is None
+
+    result = map_content_to_frontend(gdf)
+
+    # It should serialize to geojson_map and transform correctly
+    assert result["type"] == "geojson_map"
+
+    features = result["content"]["features"]
+    assert len(features) == 1
+
+    # Check that coordinates are transformed to WGS84
+    coords = features[0]["geometry"]["coordinates"]
+    assert coords[0] == pytest.approx(5.387, abs=0.01)
+    assert coords[1] == pytest.approx(52.155, abs=0.01)
