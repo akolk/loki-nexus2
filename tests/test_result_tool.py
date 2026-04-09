@@ -30,6 +30,31 @@ def test_map_content_to_frontend_geodataframe():
     assert coords[0] == pytest.approx(5.3872, abs=0.01)
     assert coords[1] == pytest.approx(52.1551, abs=0.01)
 
+def test_map_content_to_frontend_geodataframe_no_crs():
+    # Points in RD New (EPSG:28992) for Amersfoort
+    df = pd.DataFrame(
+        {'City': ['Amersfoort'],
+         'lon': [155000.0],
+         'lat': [463000.0]}
+    )
+    # No CRS set initially
+    gdf = gpd.GeoDataFrame(
+        df, geometry=gpd.points_from_xy(df.lon, df.lat)
+    )
+
+    result = map_content_to_frontend(gdf)
+
+    # It should serialize to geojson_map and convert to EPSG:4326 automatically
+    assert result["type"] == "geojson_map"
+    assert "content" in result
+    features = result["content"]["features"]
+    assert len(features) == 1
+
+    coords = features[0]["geometry"]["coordinates"]
+    # Roughly Amersfoort coordinates in WGS84
+    assert coords[0] == pytest.approx(5.3872, abs=0.1)
+    assert coords[1] == pytest.approx(52.1551, abs=0.1)
+
 def test_map_content_to_frontend_dataframe():
     df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})
     result = map_content_to_frontend(df)

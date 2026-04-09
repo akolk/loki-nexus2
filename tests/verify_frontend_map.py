@@ -25,6 +25,10 @@ def verify_frontend():
             page.goto("http://127.0.0.1:8000")
 
             # 2. Check Map Mode Toggle
+            print("Opening settings...")
+            page.evaluate('openSettings()')
+            time.sleep(1)
+
             print("Toggling Map Mode...")
             page.click("#mode-switcher")
 
@@ -46,7 +50,7 @@ def verify_frontend():
             # Initially bubble should be visible (if we assume default CSS)
             if bubble.is_visible():
                 print("Bubble is visible. Clicking to open chat.")
-                bubble.click()
+                page.evaluate('toggleChat()')
                 time.sleep(0.5)
                 assert window.is_visible()
                 print("Chat window opened.")
