@@ -1,17 +1,25 @@
 import pytest
-from unittest.mock import patch
-from backend.agent import run_agent, AgentResponse, AgentDeps
+from unittest.mock import patch, MagicMock
+from backend.agents.chat import run_agent
+from backend.agents.base import AgentResponse, AgentDeps
 from backend.models import Soul
 from sqlmodel import Session, create_engine, SQLModel
 import asyncio
 
-engine = create_engine("sqlite:///:memory:")
+engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
 SQLModel.metadata.create_all(engine)
 
 @pytest.fixture
 def db_session():
     with Session(engine) as session:
         yield session
+
+class MockRunResult:
+    def __init__(self, output):
+        self.output = output
+
+    def all_messages(self):
+        return []
 
 @pytest.mark.asyncio
 async def test_run_agent_execution_with_null_related(db_session):
@@ -25,7 +33,10 @@ async def test_run_agent_execution_with_null_related(db_session):
         disclaimer="Mock disclaimer"
     )
 
-    with patch('backend.agent._connect_mcp_and_run', return_value=mock_agent_response):
+    async def mock_run_coroutine(*args, **kwargs):
+        return MockRunResult(mock_agent_response)
+
+    with patch('backend.agents.chat.agent.run', new=mock_run_coroutine):
         res = await run_agent("Test no related", deps)
 
         assert "related" in res["response"]
@@ -33,7 +44,6 @@ async def test_run_agent_execution_with_null_related(db_session):
 
 @pytest.mark.asyncio
 async def test_run_agent_execution(db_session):
-    # Setup dependencies
     soul = Soul(user_id="1", username="test_user", style="concise")
     deps = AgentDeps(user_soul=soul, db_session=db_session, user_id=1)
 
@@ -44,14 +54,13 @@ async def test_run_agent_execution(db_session):
         disclaimer="Mock disclaimer"
     )
 
-    with patch('backend.agent._connect_mcp_and_run', return_value=mock_agent_response):
+    async def mock_run_coroutine(*args, **kwargs):
+        return MockRunResult(mock_agent_response)
+
+    with patch('backend.agents.chat.agent.run', new=mock_run_coroutine):
         res = await run_agent("Test execution query", deps)
 
         assert res["exec_result"] is not None
-        # `map_content_to_frontend` returns the dict as-is if type is dict
-        # wait, let's see what map_content_to_frontend does. It says:
-        # if content.get("type") in ["geojson_map", "dataframe", "picture", "html", "plotly", "folium", "dict"]:
-        #    return content
         assert res["exec_result"]["data"] == "test_data"
         assert res["response"]["answer"] == "Here is the execution result."
         assert "related" in res["response"]
