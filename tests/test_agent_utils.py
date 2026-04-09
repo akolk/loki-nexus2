@@ -1,5 +1,5 @@
 import pytest
-from backend.agent import get_result
+from backend.agents.chat import get_result
 
 def test_get_result_removes_unallowed_globals():
     allowed_globals = {"pd", "np", "px"}
