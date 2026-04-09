@@ -62,7 +62,7 @@ def sys_prompt() -> str:
         ### Context
         - You may access the internet for OGC APIs or CBS APIs returned by the tools.
         - Calculations must be performed in EPSG:28992 (RD New) and visualizations must be returned in WGS84 (EPSG:4326).
-        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb
+        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb. DO NOT USE matplotlib, folium, mapbox, or other external libraries.
 
         ### Directives for the `code` field
         1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments.
