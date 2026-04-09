@@ -62,3 +62,16 @@ def test_execute_query_lazy_loading():
     results = tool.execute_query("SELECT * FROM large_table")
     # Must enforce lazy limit of 100
     assert len(results) == 100
+
+def test_datatool_transformer_cached():
+    tool = DataTool()
+    assert hasattr(tool, 'transformer')
+    assert tool.transformer is not None
+    # Ensure it's reused
+    transformer_id = id(tool.transformer)
+
+    tool.con.execute("CREATE TABLE test_transform (id INTEGER, x INTEGER, y INTEGER)")
+    tool.con.execute("INSERT INTO test_transform VALUES (1, 155000, 463000)")
+    tool.execute_query("SELECT * FROM test_transform")
+
+    assert id(tool.transformer) == transformer_id
