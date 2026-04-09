@@ -30,6 +30,58 @@ def test_map_content_to_frontend_geodataframe():
     assert coords[0] == pytest.approx(5.3872, abs=0.01)
     assert coords[1] == pytest.approx(52.1551, abs=0.01)
 
+def test_map_content_to_frontend_geodataframe_missing_crs():
+    # Create a simple GeoDataFrame with no CRS, should assume EPSG:28992
+    df = pd.DataFrame(
+        {'City': ['Amersfoort'],
+         'x': [155000],
+         'y': [463000]}
+    )
+    gdf = gpd.GeoDataFrame(
+        df, geometry=gpd.points_from_xy(df.x, df.y)
+    )
+
+    result = map_content_to_frontend(gdf)
+
+    assert result["type"] == "geojson_map"
+    assert "content" in result
+    assert "features" in result["content"]
+
+    features = result["content"]["features"]
+    assert len(features) == 1
+
+    # Should be converted to EPSG:4326 (WGS84)
+    coords = features[0]["geometry"]["coordinates"]
+    # approximate lat/lon for Amersfoort
+    assert coords[0] == pytest.approx(5.387, abs=0.1)
+    assert coords[1] == pytest.approx(52.155, abs=0.1)
+
+def test_map_content_to_frontend_geodataframe_rd_new():
+    # Create a simple GeoDataFrame with EPSG:28992
+    df = pd.DataFrame(
+        {'City': ['Amersfoort'],
+         'x': [155000],
+         'y': [463000]}
+    )
+    gdf = gpd.GeoDataFrame(
+        df, geometry=gpd.points_from_xy(df.x, df.y), crs="EPSG:28992"
+    )
+
+    result = map_content_to_frontend(gdf)
+
+    assert result["type"] == "geojson_map"
+    assert "content" in result
+    assert "features" in result["content"]
+
+    features = result["content"]["features"]
+    assert len(features) == 1
+
+    # Should be converted to EPSG:4326 (WGS84)
+    coords = features[0]["geometry"]["coordinates"]
+    # approximate lat/lon for Amersfoort
+    assert coords[0] == pytest.approx(5.387, abs=0.1)
+    assert coords[1] == pytest.approx(52.155, abs=0.1)
+
 def test_map_content_to_frontend_dataframe():
     df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})
     result = map_content_to_frontend(df)
