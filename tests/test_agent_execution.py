@@ -4,6 +4,17 @@ from backend.agent import run_agent, AgentResponse, AgentDeps
 from backend.models import Soul
 from sqlmodel import Session, create_engine, SQLModel
 import asyncio
+from unittest.mock import Mock
+
+class MockRunResult:
+    def __init__(self, output):
+        self.output = output
+
+    def all_messages(self):
+        return []
+
+def get_mock_result(output):
+    return MockRunResult(output)
 
 engine = create_engine("sqlite:///:memory:")
 SQLModel.metadata.create_all(engine)
@@ -25,7 +36,7 @@ async def test_run_agent_execution_with_null_related(db_session):
         disclaimer="Mock disclaimer"
     )
 
-    with patch('backend.agent._connect_mcp_and_run', return_value=mock_agent_response):
+    with patch('backend.agents.chat.agent.run', return_value=get_mock_result(mock_agent_response)):
         res = await run_agent("Test no related", deps)
 
         assert "related" in res["response"]
@@ -44,7 +55,7 @@ async def test_run_agent_execution(db_session):
         disclaimer="Mock disclaimer"
     )
 
-    with patch('backend.agent._connect_mcp_and_run', return_value=mock_agent_response):
+    with patch('backend.agents.chat.agent.run', return_value=get_mock_result(mock_agent_response)):
         res = await run_agent("Test execution query", deps)
 
         assert res["exec_result"] is not None
