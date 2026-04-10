@@ -18,14 +18,20 @@ async def test_run_agent_execution_with_null_related(db_session):
     soul = Soul(user_id="1", username="test_user", style="concise")
     deps = AgentDeps(user_soul=soul, db_session=db_session, user_id=1)
 
-    mock_agent_response = AgentResponse(
+    class MockRunResult:
+        def __init__(self, output):
+            self.output = output
+        def all_messages(self):
+            return []
+
+    mock_agent_response = MockRunResult(AgentResponse(
         answer="Answer without related questions.",
         related=None,
         code="result = {'data': 'test_data2', 'type': 'dict'}",
         disclaimer="Mock disclaimer"
-    )
+    ))
 
-    with patch('backend.agent._connect_mcp_and_run', return_value=mock_agent_response):
+    with patch('backend.agents.chat.agent.run', return_value=mock_agent_response):
         res = await run_agent("Test no related", deps)
 
         assert "related" in res["response"]
@@ -37,21 +43,23 @@ async def test_run_agent_execution(db_session):
     soul = Soul(user_id="1", username="test_user", style="concise")
     deps = AgentDeps(user_soul=soul, db_session=db_session, user_id=1)
 
-    mock_agent_response = AgentResponse(
+    class MockRunResult:
+        def __init__(self, output):
+            self.output = output
+        def all_messages(self):
+            return []
+
+    mock_agent_response = MockRunResult(AgentResponse(
         answer="Here is the execution result.",
         related=["Q1?"],
         code="result = {'data': 'test_data', 'type': 'dict'}",
         disclaimer="Mock disclaimer"
-    )
+    ))
 
-    with patch('backend.agent._connect_mcp_and_run', return_value=mock_agent_response):
+    with patch('backend.agents.chat.agent.run', return_value=mock_agent_response):
         res = await run_agent("Test execution query", deps)
 
         assert res["exec_result"] is not None
-        # `map_content_to_frontend` returns the dict as-is if type is dict
-        # wait, let's see what map_content_to_frontend does. It says:
-        # if content.get("type") in ["geojson_map", "dataframe", "picture", "html", "plotly", "folium", "dict"]:
-        #    return content
         assert res["exec_result"]["data"] == "test_data"
         assert res["response"]["answer"] == "Here is the execution result."
         assert "related" in res["response"]

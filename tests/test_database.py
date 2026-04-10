@@ -65,3 +65,31 @@ def test_get_session(mock_session):
     # Complete the generator
     with pytest.raises(StopIteration):
         next(generator)
+
+def test_metadata_db_missing_credentials():
+    import importlib
+    import os
+    import backend.database_metadata
+
+    # Simulate missing credentials
+    original_user = os.environ.get("LOKI_METADATA_USER")
+    original_password = os.environ.get("LOKI_METADATA_PASSWORD")
+
+    os.environ["LOKI_METADATA_USER"] = ""
+    os.environ["LOKI_METADATA_PASSWORD"] = ""
+
+    with pytest.raises(RuntimeError, match="LOKI_METADATA_USER and LOKI_METADATA_PASSWORD environment variables are required."):
+        importlib.reload(backend.database_metadata)
+
+    # Restore
+    if original_user is not None:
+        os.environ["LOKI_METADATA_USER"] = original_user
+    else:
+        del os.environ["LOKI_METADATA_USER"]
+
+    if original_password is not None:
+        os.environ["LOKI_METADATA_PASSWORD"] = original_password
+    else:
+        del os.environ["LOKI_METADATA_PASSWORD"]
+
+    importlib.reload(backend.database_metadata)
