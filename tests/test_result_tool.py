@@ -44,3 +44,31 @@ def test_map_content_to_frontend_dict():
 
     assert result["type"] == "html"
     assert result["content"] == "<div>Hello</div>"
+
+def test_map_content_to_frontend_geodataframe_no_crs():
+    # Create a simple GeoDataFrame with no CRS
+    df = pd.DataFrame(
+        {'City': ['Amersfoort'],
+         'lon': [155000],
+         'lat': [463000]}
+    )
+    gdf = gpd.GeoDataFrame(
+        df, geometry=gpd.points_from_xy(df.lon, df.lat)
+    )
+    # gdf.crs is None by default here
+
+    result = map_content_to_frontend(gdf)
+
+    # It should serialize to geojson_map
+    assert result["type"] == "geojson_map"
+    assert "content" in result
+    assert "features" in result["content"]
+
+    features = result["content"]["features"]
+    assert len(features) == 1
+
+    # Check that coordinates are converted from EPSG:28992 to EPSG:4326 correctly
+    # Amersfoort in RD is ~ (155000, 463000). In WGS84 it is ~ (5.387, 52.155)
+    coords = features[0]["geometry"]["coordinates"]
+    assert coords[0] == pytest.approx(5.3872, abs=0.1)
+    assert coords[1] == pytest.approx(52.1551, abs=0.1)

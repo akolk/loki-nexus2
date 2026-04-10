@@ -4,12 +4,16 @@ from typing import Optional, Dict, Any, List
 import logging
 import asyncio
 
-from backend.jobs.scheduler import (
-    create_job as metadata_create_job,
-    delete_job as metadata_delete_job,
-    run_job as metadata_run_job
+from backend.scheduler import (
+    create_metadata_job,
+    delete_metadata_job,
+    run_metadata_job
 )
 from backend.tools.metadata_lookup import search_metadata
+from backend.skills_manager import get_skills_manager
+from backend.database_metadata import get_metadata_session
+from backend.models_metadata import Job, MetadataSource, MetadataEndpoint
+from sqlmodel import select, func
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +23,6 @@ router = APIRouter(prefix="/metadata", tags=["metadata"])
 @router.get("/skills")
 def list_skills() -> Dict[str, Any]:
     """List loaded skills from the skills directory."""
-    from backend.skills_manager import get_skills_manager
-    
     manager = get_skills_manager()
     if not manager:
         return {"skills_dir": None, "enabled": False, "skills": []}
@@ -45,8 +47,6 @@ def list_skills() -> Dict[str, Any]:
 @router.post("/skills/refresh")
 def refresh_skills() -> Dict[str, str]:
     """Force refresh skills from the skills directory."""
-    from backend.skills_manager import get_skills_manager
-    
     manager = get_skills_manager()
     if not manager:
         raise HTTPException(status_code=404, detail="Skills manager not initialized")
@@ -66,7 +66,7 @@ class MetadataJobRequest(BaseModel):
 
 
 @router.post("/jobs")
-def create_metadata_job(job_req: MetadataJobRequest) -> Dict[str, Any]:
+def create_metadata_job_endpoint(job_req: MetadataJobRequest) -> Dict[str, Any]:
     try:
         config = {"source": job_req.source}
         
@@ -93,10 +93,6 @@ def create_metadata_job(job_req: MetadataJobRequest) -> Dict[str, Any]:
 
 @router.get("/jobs")
 def list_metadata_jobs() -> List[Dict[str, Any]]:
-    from backend.database_metadata import get_metadata_session
-    from backend.models_metadata import Job
-    from sqlmodel import select
-    
     session = get_metadata_session()
     try:
         jobs = session.exec(select(Job)).all()
@@ -122,7 +118,7 @@ def list_metadata_jobs() -> List[Dict[str, Any]]:
 
 
 @router.delete("/jobs/{job_id}")
-def delete_metadata_job(job_id: int) -> Dict[str, str]:
+def delete_metadata_job_endpoint(job_id: int) -> Dict[str, str]:
     try:
         metadata_delete_job(job_id)
         return {"status": "Job deleted"}
@@ -132,7 +128,7 @@ def delete_metadata_job(job_id: int) -> Dict[str, str]:
 
 
 @router.post("/jobs/{job_id}/run")
-def run_metadata_job(job_id: int) -> Dict[str, str]:
+def run_metadata_job_endpoint(job_id: int) -> Dict[str, str]:
     try:
         asyncio.run(metadata_run_job(job_id))
         return {"status": "Job completed"}
@@ -157,10 +153,6 @@ def search_metadata_endpoint(
 
 @router.get("/sources")
 def list_metadata_sources() -> List[Dict[str, Any]]:
-    from backend.database_metadata import get_metadata_session
-    from backend.models_metadata import MetadataSource
-    from sqlmodel import select
-    
     session = get_metadata_session()
     try:
         sources = session.exec(select(MetadataSource)).all()
@@ -184,10 +176,6 @@ def list_metadata_sources() -> List[Dict[str, Any]]:
 @router.get("/counts")
 def get_metadata_counts() -> Dict[str, Any]:
     """Get endpoint counts for each metadata source."""
-    from backend.database_metadata import get_metadata_session
-    from backend.models_metadata import MetadataSource, MetadataEndpoint
-    from sqlmodel import select, func
-    
     session = get_metadata_session()
     try:
         counts = []
