@@ -19,11 +19,19 @@ def map_content_to_frontend(content):
     print(f"MAP_TO_CONTENT: {type(content)}")
     if isinstance(content, gpd.GeoDataFrame):
         # Convert to WGS84 just in case, typical for Leaflet
-        if content.crs and content.crs.to_string() != "EPSG:4326":
+        if content.crs is None:
+            content = content.set_crs("EPSG:28992")
+        if content.crs.to_string() != "EPSG:4326":
             content = content.to_crs("EPSG:4326")
 
-        geojson_str = content.to_json()
-        geojson_data = json.loads(geojson_str)
+        # Convert datetime columns to strings before serialization
+        for col in content.select_dtypes(include=['datetime64', 'datetimetz']).columns:
+            content[col] = content[col].astype(str)
+
+        # Handle NaNs (replace with None so it serializes to json null instead of string "")
+        content = content.where(pd.notnull(content), None)
+
+        geojson_data = json.loads(content.to_json())
         return {"type": "geojson_map", "content": {"features": geojson_data.get("features", [])}}
 
     elif isinstance(content, pd.DataFrame):
