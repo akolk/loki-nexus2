@@ -192,16 +192,25 @@ def get_metadata_counts() -> Dict[str, Any]:
     try:
         counts = []
         
-        sources = session.exec(select(MetadataSource)).all()
-        for source in sources:
-            count = session.exec(
-                select(func.count(MetadataEndpoint.id)).where(MetadataEndpoint.source_id == source.id)
-            ).first()
+        stmt = (
+            select(
+                MetadataSource.id,
+                MetadataSource.name,
+                MetadataSource.source_type,
+                func.count(MetadataEndpoint.id).label("endpoint_count")
+            )
+            .outerjoin(MetadataEndpoint, MetadataSource.id == MetadataEndpoint.source_id)
+            .group_by(MetadataSource.id)
+        )
+
+        results = session.exec(stmt).all()
+
+        for row in results:
             counts.append({
-                "source_id": source.id,
-                "source_name": source.name,
-                "source_type": source.source_type,
-                "endpoint_count": count or 0
+                "source_id": row.id,
+                "source_name": row.name,
+                "source_type": row.source_type,
+                "endpoint_count": row.endpoint_count or 0
             })
         
         return {"sources": counts}
