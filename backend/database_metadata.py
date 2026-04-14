@@ -1,6 +1,5 @@
 import os
 import logging
-from typing import Optional
 from sqlmodel import SQLModel, create_engine, Session
 from sqlalchemy.pool import NullPool
 from sqlalchemy import text
