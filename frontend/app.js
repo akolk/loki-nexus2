@@ -871,7 +871,7 @@ function appendMessage(role, content, execResult=null, related=[], extraData={})
             { key: 'reasoning', icon: 'R', title: 'Reasoning', content: extraData.reasoning || 'No reasoning available', color: '#00695C' },
             { key: 'error', icon: 'X', title: 'Error', content: extraData.error || 'No error', color: '#D32F2F', showOnlyWhenSet: true },
             { key: 'explain', icon: 'i', title: 'Explain', content: 'Explain placeholder: This feature provides additional context about the response.', color: '#00529B' },
-            { key: 'usage', icon: 'U', title: 'Usage', content: 'Usage placeholder: This feature shows how to use the results.', color: '#00529B' }
+            { key: 'usage', icon: 'U', title: 'Usage', content: extraData.usage ? `Input: ${extraData.usage.input_tokens} tokens\nOutput: ${extraData.usage.output_tokens} tokens\nTotal: ${extraData.usage.total_tokens} tokens\nRequests: ${extraData.usage.requests}` : 'No usage data', color: '#00529B' }
         ];
 
         const filteredIcons = icons.filter(icon => !icon.showOnlyWhenSet || (icon.showOnlyWhenSet && extraData[icon.key]));
@@ -894,7 +894,30 @@ function appendMessage(role, content, execResult=null, related=[], extraData={})
             iconBtn.onmouseenter = () => { iconBtn.style.background = item.color + "40"; };
             iconBtn.onmouseleave = () => { iconBtn.style.background = item.color + "20"; };
             
-            iconBtn.onclick = () => openModal(item.title, item.content);
+            if (item.key === 'explain' && extraData.code) {
+                iconBtn.onclick = async () => {
+                    openModal('Explain', 'Loading explanation...');
+                    try {
+                        const response = await fetch('/explain', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'x-forwarded-user': username
+                            },
+                            body: JSON.stringify({
+                                code: extraData.code,
+                                language: 'python'
+                            })
+                        });
+                        const data = await response.json();
+                        openModal('Explain', data.explanation || 'No explanation available');
+                    } catch (e) {
+                        openModal('Explain', 'Error explaining code: ' + e.message);
+                    }
+                };
+            } else {
+                iconBtn.onclick = () => openModal(item.title, item.content);
+            }
             iconsContainer.appendChild(iconBtn);
         });
 
@@ -972,7 +995,8 @@ async function sendMessage() {
             code: data.code,
             disclaimer: data.disclaimer,
             reasoning: data.reasoning,
-            error: data.error
+            error: data.error,
+            usage: data.usage
         };
         if (data.exec_result) {
             appendMessage("model", data.response, data.exec_result, data.related, extraData);

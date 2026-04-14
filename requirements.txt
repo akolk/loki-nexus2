@@ -23,4 +23,4 @@ scikit-learn==1.8.0
 xgboost==3.2.0
 openai
 pgvector
-pydantic-ai-skills
+pydantic-ai-skills[git]

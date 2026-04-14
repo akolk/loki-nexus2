@@ -15,7 +15,7 @@ import geopandas as gpd
 import plotly.express as px
 import plotly.graph_objects as go
 from pydantic_ai import Agent, RunContext
-from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart, SystemPromptPart
+from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart, SystemPromptPart, ThinkingPart, ThinkingPartDelta
 from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
 from sqlmodel import select
 from textwrap import dedent
@@ -26,7 +26,6 @@ from backend.tools.result_tool import map_content_to_frontend
 from backend.skills_manager import get_skills_toolsets
 
 logger = logging.getLogger(__name__)
-skill_toolset = []
 
 if os.environ.get("OPENAI_API_KEY"):
     model_name_env = os.environ.get("OPENAI_MODEL_NAME", "gpt-5.2")
@@ -48,19 +47,24 @@ model_settings = OpenAIResponsesModelSettings(
 
 level = "medior"
 
-
-def sys_prompt() -> str:
+def sys_prompt(soul, memory) -> str:
     return dedent(f"""
-        You are an expert Python data scientist talking to a {level} user. Always make sure user questions are specific, ask for information if necessary.
+        You are an expert Python data scientist talking to:
+        {soul}. 
+        Always make sure user questions are specific, ask for information if necessary.
+        Remember {memory}
+        
+        IMPORTANT: Always respond in Dutch. Both the `answer` field and any code comments (if needed) must be in Dutch.
+
         Return a Pydantic object with fields:
-        - answer (keep it concise, don't invent anything, use only Context below).
+        - answer (remember who you talking to of assume novice user.)
         - related (2 SHORT related questions)
         - code (A complete, self-contained hardened Python script without comments which produces the requested analysis/visualization. The script must contain variables `rows_used` holding the number of analyzed rows, and `result` holding the final output)
         - disclaimer (A short disclaimer about data quality, limitations if applicable and urls of datasets used - use only Context below)
         Based on the user question and chat history.
 
         ### Context
-        - You may access the internet for OGC APIs or CBS APIs returned by the tools.
+        - If needed, you may access the internet for OGC APIs or CBS APIs returned by the tools.
         - Calculations must be performed in EPSG:28992 (RD New) and visualizations must be returned in WGS84 (EPSG:4326).
         - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb
 
@@ -95,21 +99,19 @@ agent = Agent(
     model_settings=model_settings
 )
 
-
 @agent.tool
 def pdok_ogc_api(ctx: RunContext[AgentDeps], ogc_dataset: str, top_k: int = 5, filter_geojson: bool = True) -> str:
-    """Query the metadata database for the best matching PDOK OGC API endpoints.
-    
+    """Query the metadata database for the best matching OGC API endpoints. Use bbox of viewport.
+
     Args:
-        ogc_dataset: The search query for PDOK datasets
+        ogc_dataset: The search query for OGC endpoints/datasets
         top_k: Number of results to return (default 5, max 20)
         filter_geojson: If True (default), only return GeoJSON-capable endpoints (OGC API Features with /collections)
     """
     from backend.tools.metadata_lookup import find_endpoint
     top_k = min(max(1, top_k), 20)
-    logger.info(f"PDOK_OGC_API: {ogc_dataset}, top_k={top_k}, filter_geojson={filter_geojson}")
+    logger.info(f"OGC_API: {ogc_dataset}, top_k={top_k}, filter_geojson={filter_geojson}")
     return find_endpoint(ogc_dataset, source_type="pdok", top_k=top_k, filter_geojson=filter_geojson)
-
 
 @agent.tool
 def cbs_api(ctx: RunContext[AgentDeps], cbs_dataset: str, top_k: int = 5) -> str:
@@ -232,30 +234,13 @@ Respond only with valid JSON."""
         logger.error(f"Error updating soul: {e}")
         return f"Error updating soul: {str(e)}"
 
-# Add skills instructions to agent (includes skill names and descriptions)
+
 @agent.instructions
 async def add_skills(ctx: RunContext) -> str | None:
     """Add skills instructions to the agent's context."""
-    toolsets = get_skills_toolsets()
-    if not toolsets:
-        logger.warning("No toolsets available for skills instructions")
-        return None
-    
-    instructions_parts = []
-    for toolset in toolsets:
-        try:
-            instr = await toolset.get_instructions(ctx)
-            if instr:
-                logger.info(f"Got instructions from toolset: {len(instr)} chars")
-                instructions_parts.append(instr)
-            else:
-                logger.warning("Toolset returned empty instructions")
-        except Exception as e:
-            logger.warning(f"Failed to get instructions from toolset: {e}")
-    
-    result = "\n\n".join(instructions_parts) if instructions_parts else None
-    logger.info(f"Total skills instructions: {len(result) if result else 0} chars")
-    return result
+    toolset = get_skills_toolsets()
+    return await toolset.get_instructions(ctx) if toolset else None
+
 
 def build_system_prompt(ctx: AgentDeps, toolsets: List = None) -> str:
     """Build the complete system prompt including skills."""
@@ -264,15 +249,7 @@ def build_system_prompt(ctx: AgentDeps, toolsets: List = None) -> str:
     memory_str = f"\nMemory about user: {memory}" if memory else ""
     userinfo = f"User Preferences: {soul.preferences}. Communication Style: {soul.style}.{memory_str}"
     
-    skills_text = ""
-    if toolsets:
-        skills_parts = []
-        for ts in toolsets:
-            skills_parts.append(f"<!-- Skill: {type(ts).__name__} -->")
-        if skills_parts:
-            skills_text = "\n\n" + "\n\n".join(skills_parts)
-    
-    return f"{userinfo}\n\n" + sys_prompt() + skills_text
+    return f"{userinfo}\n\n" + sys_prompt(userinfo, memory_str)
 
 
 async def build_system_prompt_async(ctx: AgentDeps, toolsets: List = None) -> str:
@@ -282,22 +259,7 @@ async def build_system_prompt_async(ctx: AgentDeps, toolsets: List = None) -> st
     memory_str = f"\nMemory about user: {memory}" if memory else ""
     userinfo = f"User Preferences: {soul.preferences}. Communication Style: {soul.style}.{memory_str}"
     
-    skills_text = ""
-    if toolsets:
-        skills_parts = []
-        for ts in toolsets:
-            try:
-                # Get the full skill content directly
-                if hasattr(ts, 'skills'):
-                    for skill_name, skill_obj in ts.skills.items():
-                        if hasattr(skill_obj, 'content') and skill_obj.content:
-                            skills_parts.append(f"=== {skill_name.upper()} SKILL ===\n{skill_obj.content}")
-            except Exception as e:
-                logger.warning(f"Failed to get skill content: {e}")
-        if skills_parts:
-            skills_text = "\n\n" + "\n\n".join(skills_parts)
-    
-    return f"{userinfo}\n\n" + sys_prompt() + skills_text
+    return f"{userinfo}\n\n" + sys_prompt(userinfo, memory_str)
 
 def get_result(exec_globals: Dict[str, Any], allowed_globals: set) -> Any:
     result = exec_globals.get("result")
@@ -312,11 +274,8 @@ def get_result(exec_globals: Dict[str, Any], allowed_globals: set) -> Any:
 
 async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
     """Runs the agent and stores the result in the DB."""
-    toolsets: List[Any] = []
-
-    logger.debug(deps)
-
-    toolsets.extend(get_skills_toolsets())
+    toolset = get_skills_toolsets()
+    toolsets = [toolset] if toolset else []
 
     statement = select(ChatHistory).where(ChatHistory.user_id == deps.user_id).order_by(ChatHistory.timestamp.desc()).limit(10)
    
@@ -342,17 +301,35 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
         agent_response = result.output
         
         reasoning = None
+        usage = None
+        logger.info(f"Agent response: {agent_response}")
         for msg in result.all_messages():
+            #logger.info(f"Checking message for reasoning: {msg}")  
             if hasattr(msg, 'parts'):
                 for part in msg.parts:
-                    if hasattr(part, 'thinking') and part.thinking:
-                        reasoning = part.thinking
-                        break
+                    logger.info(f"Checking message part for reasoning: {part}")
+                    if isinstance(part, ThinkingPart):    
+                        reasoning = part.content
+                    elif isinstance(part, ThinkingPartDelta):
+                        if reasoning is None:
+                            reasoning = ""
+                        reasoning += part.content
                     elif hasattr(part, 'content') and isinstance(part.content, str) and 'thinking' in part.content.lower():
                         reasoning = part.content
-                        break
         
-        logger.debug(f"agent_response={agent_response}, reasoning={reasoning}")
+        if hasattr(result, 'usage') and callable(result.usage):
+            usage_obj = result.usage()
+            logger.info(f"Usage object: {usage_obj}, type: {type(usage_obj)}")
+            if usage_obj:
+                usage = {
+                    "input_tokens": usage_obj.input_tokens,
+                    "output_tokens": usage_obj.output_tokens,
+                    "total_tokens": usage_obj.total_tokens if hasattr(usage_obj, 'total_tokens') else (usage_obj.input_tokens + usage_obj.output_tokens),
+                    "requests": usage_obj.requests
+                }
+                logger.info(f"Parsed usage: {usage}")
+        
+        logger.debug(f"agent_response={agent_response}, reasoning={reasoning}, usage={usage}")
     except Exception as e:
         logger.error(f"Error executing agent in run_agent: {e}", exc_info=True)
         raise e
@@ -455,5 +432,6 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
             "reasoning": reasoning or agent_response.reasoning,
             "error": exec_error
         },
-        "exec_result": exec_result
+        "exec_result": exec_result,
+        "usage": usage
     }

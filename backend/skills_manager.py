@@ -1,84 +1,82 @@
 import logging
 import os
-import time
-from typing import List, Optional
-from threading import Lock
+from typing import Optional
 
-from pydantic_ai_skills import SkillsDirectory, SkillsToolset
-from pydantic_ai.toolsets.combined import AbstractToolset
+from pydantic_ai_skills import SkillsToolset, LocalSkillScriptExecutor, discover_skills, GitSkillsRegistry
 
 logger = logging.getLogger(__name__)
 
 
 class SkillsManager:
-    """Manages skills loading and periodic refresh from a directory."""
+    """Manages skills loading from local directory or Git registry."""
     
     def __init__(self, skills_dir: str = "/app/backend/skills", refresh_interval: int = 300):
         self.skills_dir = skills_dir
         self.refresh_interval = refresh_interval
-        self._toolsets: List[AbstractToolset] = []
-        self._last_refresh = 0
-        self._lock = Lock()
-        self._enabled = os.path.exists(skills_dir)
+        self._toolset: Optional[SkillsToolset] = None
+        self._enabled = False
         
-        if self._enabled:
-            logger.info(f"Skills directory found: {skills_dir}")
-            self._load_skills()
-        else:
-            logger.warning(f"Skills directory not found: {skills_dir}")
+        self._load_skills()
     
     def _load_skills(self) -> None:
-        """Load all skills from subdirectories into a single SkillsToolset."""
-        from pydantic_ai_skills import SkillsDirectory, SkillsToolset
+        """Load skills from registry or local directory."""
+        skills_registry_url = os.environ.get("SKILLS_REGISTRY")
         
-        with self._lock:
-            self._toolsets = []
-            
-            if not os.path.exists(self.skills_dir):
-                logger.warning(f"Skills directory does not exist: {self.skills_dir}")
-                return
-            
-            skill_dirs = []
-            for entry in os.listdir(self.skills_dir):
-                if entry.startswith("."):
-                    continue
-                
-                full_path = os.path.join(self.skills_dir, entry)
-                
-                if not os.path.isdir(full_path):
-                    continue
-                
-                skill_dirs.append(SkillsDirectory(path=full_path))
-                logger.info(f"Found skill: {entry}")
-            
-            if skill_dirs:
-                toolset = SkillsToolset(directories=skill_dirs)
-                self._toolsets.append(toolset)
-                logger.info(f"Loaded {len(skill_dirs)} skills in single toolset")
-            
-            self._last_refresh = time.time()
+        if skills_registry_url:
+            logger.info(f"Loading skills from registry: {skills_registry_url}")
+            self._load_from_registry(skills_registry_url)
+        elif os.path.exists(self.skills_dir):
+            logger.info(f"Skills directory found: {self.skills_dir}")
+            self._load_from_directory()
+        else:
+            logger.info("No skills registry configured and local skills directory not found, skipping skills")
     
-    def should_refresh(self) -> bool:
-        """Check if skills should be refreshed."""
-        if not self._enabled:
-            return False
-        return (time.time() - self._last_refresh) > self.refresh_interval
+    def _load_from_registry(self, registry_url: str) -> None:
+        """Load skills from a Git registry."""
+        try:
+            if registry_url.startswith("http://") or registry_url.startswith("https://") or registry_url.startswith("git@"):
+                git_registry = GitSkillsRegistry(repo_url=registry_url)
+                skills = git_registry.get_skills()
+            else:
+                skills = discover_skills(
+                    path=registry_url,
+                    validate=True,
+                    max_depth=3,
+                    script_executor=LocalSkillScriptExecutor()
+                )
+            
+            if skills:
+                self._toolset = SkillsToolset(skills=skills)
+                logger.info(f"Loaded {len(skills)} skills from registry")
+                self._enabled = True
+            else:
+                logger.warning("No skills found in registry")
+        except Exception as e:
+            logger.error(f"Failed to load skills from registry: {e}")
     
-    def refresh_if_needed(self) -> None:
-        """Refresh skills if the interval has passed."""
-        if self.should_refresh():
-            logger.info("Refreshing skills...")
-            self._load_skills()
+    def _load_from_directory(self) -> None:
+        """Load skills from local directory."""
+        skills = discover_skills(
+            path=self.skills_dir,
+            validate=True,
+            max_depth=3,
+            script_executor=LocalSkillScriptExecutor()
+        )
+        
+        if skills:
+            self._toolset = SkillsToolset(skills=skills)
+            logger.info(f"Loaded {len(skills)} skills from local directory")
+            self._enabled = True
+        else:
+            logger.warning("No skills found in local directory")
     
-    def get_toolsets(self) -> List[AbstractToolset]:
-        """Get the current toolsets."""
-        self.refresh_if_needed()
-        with self._lock:
-            return list(self._toolsets)
+    def get_toolset(self) -> Optional[SkillsToolset]:
+        """Get the current toolset."""
+        return self._toolset
     
-    def force_refresh(self) -> None:
+    def refresh(self) -> None:
         """Force a refresh of skills."""
-        logger.info("Force refreshing skills...")
+        logger.info("Refreshing skills...")
         self._load_skills()
 
 
@@ -99,9 +97,9 @@ def get_skills_manager() -> Optional[SkillsManager]:
     return _skills_manager
 
 
-def get_skills_toolsets() -> List[AbstractToolset]:
-    """Get toolsets from the skills manager, refreshing if needed."""
+def get_skills_toolsets():
+    """Get the skills toolset from the manager."""
     manager = get_skills_manager()
     if manager:
-        return manager.get_toolsets()
-    return []
+        return manager.get_toolset()
+    return None

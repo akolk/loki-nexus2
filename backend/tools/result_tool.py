@@ -42,6 +42,7 @@ def map_content_to_frontend(content):
         if content.get("type") in ["geojson_map", "dataframe", "picture", "html", "plotly", "dict", "download"]:
             return content
         return {"type": content.get("type"), "content": content}
-
+    elif isinstance(content, str):
+        return {"answer": content }
     else:
         return {"type": "error", "content": f"Error: unknown datatype {type(content)}."}

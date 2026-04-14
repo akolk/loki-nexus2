@@ -95,6 +95,8 @@ async def chat_endpoint(
         code = agent_out["response"].get("code", "Dit antwoord heeft geen code.")
         error = agent_out["response"].get("error", "Geen fouten tijdens ophalen van antwoord.")
         reasoning = agent_out["response"].get("reasoning", None)
+        usage = agent_out.get("usage", None)
+        
         if reasoning:
             logger.info(f"Reasoning: {reasoning}")
 
@@ -105,7 +107,7 @@ async def chat_endpoint(
         session.add(model_msg)
         session.commit()
 
-        return {"response": response_text, "exec_result": exec_result, "related": related, "code": code, "disclaimer": disclaimer, "error": error, "reasoning": reasoning}
+        return {"response": response_text, "exec_result": exec_result, "related": related, "code": code, "disclaimer": disclaimer, "error": error, "reasoning": reasoning, "usage": usage}
     except HTTPException:
         raise
     except Exception as e:
@@ -156,4 +158,50 @@ def delete_history(
         return {"status": "History deleted"}
     except Exception as e:
         logger.error(f"Error in delete_history: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ExplainRequest(BaseModel):
+    code: str
+    language: str = "python"
+
+
+@router.post("/explain")
+async def explain_code(
+    request: ExplainRequest,
+    user_data: Tuple[User, Soul] = Depends(get_current_user),
+    session = Depends(get_session)
+) -> Dict[str, Any]:
+    """Explain code using LLM."""
+    try:
+        user, soul = user_data
+        
+        prompt = f"""Explain the following {request.language} code to a user who may not be familiar with programming. 
+Be very explicit and detailed. Focus on:
+- What the code does (step by step)
+- How it works (explain the logic)
+- Why certain parts are needed
+- Any important details or edge cases they should know
+
+Code:
+```{request.language}
+{request.code}
+```
+
+Provide a detailed explanation in Dutch (the user's language)."""
+
+        deps = AgentDeps(
+            user_soul=soul,
+            db_session=session,
+            user_id=user.id
+        )
+        
+        from backend.agents.chat import run_agent
+        result = await run_agent(prompt, deps)
+        
+        explanation = result.get("response", {}).get("answer", "No explanation available")
+        
+        return {"explanation": explanation}
+    except Exception as e:
+        logger.error(f"Error in explain_code: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

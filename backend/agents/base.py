@@ -23,7 +23,7 @@ class AgentResponse(BaseModel):
     )
     answer: str = Field(
         ...,
-        description="Short description of the results or why the request cannot be fulfilled."
+        description="Short summary of the results or why the request cannot be fulfilled."
     )
     related: Optional[List[str]] = Field(
         default=None,

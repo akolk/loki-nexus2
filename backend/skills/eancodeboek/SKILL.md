@@ -1,6 +1,6 @@
 ---
 name: eancodeboek
-description: Use this skill whenever the user wants to look up EAN codes for Dutch electricity or gas connections, find grid operators (netbeheerders) for a Dutch address or postcode, search metering points by address, postcode or city, or integrate with the EDSN EAN Codeboek API. Trigger when the user mentions EAN codeboek, EAN code opzoeken, netbeheerder opzoeken, EDSN API, aansluitingen register, metering points, ELK/GAS aansluitingen, gasaansluiting, electriciteitsmeter, or any task involving the Dutch energy connection register. 
+description: Use this skill whenever the user wants to look up EAN codes for Dutch electricity or gas connections, find grid operators (netbeheerders) for a Dutch address or postcode, search metering points by address, postcode or city, or integrate with the EDSN EAN Codeboek API. Trigger when the user mentions EAN codeboek, EAN code opzoeken, netbeheerder opzoeken, EDSN API, aansluitingen register, transformator (huisjes), metering points, ELK/GAS aansluitingen, gasaansluiting, electriciteitsmeter, or any task involving the Dutch energy connection register. 
 ---
 
 # IMPORTANT: Always use this exact base URL in your code:
@@ -36,7 +36,7 @@ Zoek meetpunten (aansluitingen) op basis van adresgegevens. Retourneert EAN-code
 - `product`: `ELK` (elektriciteit) of `GAS`
 
 **Paginering:**
-- `limit`: aantal resultaten per pagina (default 100, max 1000)
+- `limit`: aantal resultaten per pagina (default 100, max 100)
 - `offset`: startpositie (default 0)
 
 **Voorbeeld request:**
@@ -47,22 +47,20 @@ GET https://gateway.edsn.nl/eancodeboek/v1/ecbinfoset?product=ELK&postalCode=733
 **Raw response:**
 ```json
 {
-  "count": 1,
-  "offset": 0,
-  "limit": 100,
-  "results": [
+  "meteringPoints": [
     {
       "ean": "871687940000000001",
       "product": "ELK",
-      "postalCode": "3010CK",
-      "streetNumber": "1",
-      "streetNumberAddition": null,
-      "street": "Voorbeeldstraat",
-      "city": "Rotterdam",
-      "gridOperator": {
-        "ean": "8716867000009",
-        "name": "Stedin Netbeheer B.V."
+      "address": {
+        "postalCode": "3010CK",
+        "streetNumber": "1",
+        "streetNumberAddition": null,
+        "street": "Voorbeeldstraat",
+        "city": "Rotterdam",
       },
+      "organisation": "Stedin Netbeheer B.V.",
+      "gridOperatorEan": "8716867000009",
+      "gridArea": "8716870000009",
       "specialMeteringPoint": false,
       "bagId": "0599010000000001"
     }
@@ -270,6 +268,7 @@ const operators = await getGridOperator("1012NX");
 
 ## Tips & Valkuilen
 
+- **Transformator = bijzonder meetpunt** — transformatorstations hebben geen BAG-ID en worden als `specialMeteringPoint: true` geretourneerd  en kunnen niet op adres worden gezocht, alleen op stad + bijzonder meetpunt. 
 - **Postcode zonder spatie** — geef altijd in als `3010CK`, niet `3010 CK` (of strip de spatie in code)
 - **Product verplicht bij `/ecbinfoset`** — altijd `ELK` of `GAS` meegeven
 - **Alleen gedocumenteerde parametercombinaties** — andere combinaties geven een foutmelding
