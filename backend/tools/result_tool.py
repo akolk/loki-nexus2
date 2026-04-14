@@ -1,6 +1,7 @@
+import json
+
 import geopandas as gpd
 import pandas as pd
-import json
 
 try:
     import polars as pl
@@ -31,7 +32,7 @@ def map_content_to_frontend(content):
         # Handle NaNs (replace with None so it serializes to json null instead of string "")
         content = content.where(pd.notnull(content), None)
 
-        geojson_data = json.loads(content.to_json())
+        geojson_data = json.loads(content.to_json(drop_id=True))
         return {"type": "geojson_map", "content": {"features": geojson_data.get("features", [])}}
 
     elif isinstance(content, pd.DataFrame):
