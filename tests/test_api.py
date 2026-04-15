@@ -72,3 +72,29 @@ if __name__ == "__main__":
     test_chat_flow()
     test_job_scheduling()
     print("API Tests Passed.")
+
+@patch("backend.api.chat.run_agent")
+def test_delete_history(mock_run_agent):
+    mock_run_agent.return_value = {"response": {"answer": "Mocked Agent Response"}, "exec_result": None}
+
+    # Setup DB
+    init_db()
+
+    # Create history
+    client.post(
+        "/chat",
+        data={"message": "Hello Agent"},
+        headers={"x-forwarded-user": "test_delete_user"}
+    )
+
+    # Check history exists
+    response = client.get("/history", headers={"x-forwarded-user": "test_delete_user"})
+    assert len(response.json()) > 0
+
+    # Delete history
+    response = client.delete("/history", headers={"x-forwarded-user": "test_delete_user"})
+    assert response.status_code == 200
+
+    # Check history is empty
+    response = client.get("/history", headers={"x-forwarded-user": "test_delete_user"})
+    assert len(response.json()) == 0

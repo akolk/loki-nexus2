@@ -62,3 +62,16 @@ def test_execute_query_lazy_loading():
     results = tool.execute_query("SELECT * FROM large_table")
     # Must enforce lazy limit of 100
     assert len(results) == 100
+
+def test_datatool_invalid_username():
+    with pytest.raises(ValueError, match="Invalid username format: "):
+        DataTool(username="invalid_username;")
+    with pytest.raises(ValueError, match="Invalid username containing '\\.\\.': "):
+        DataTool(username="user..name")
+
+def test_execute_query_path_traversal():
+    tool = DataTool(username="test_user")
+    # Simulate a path traversal
+    tool.username = "../root"
+    with pytest.raises(ValueError, match="Path traversal detected: "):
+        tool.execute_query("SELECT 1")

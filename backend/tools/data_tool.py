@@ -5,6 +5,7 @@ import logging
 import pandas as pd
 import numpy as np
 import pyproj
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -18,8 +19,11 @@ class DataTool:
     def __init__(self, db_path: str = ":memory:", username: Optional[str] = None):
         self.con = duckdb.connect(db_path)
         # Sanitize username: only alphanumeric, underscores, hyphens, and dots
-        if username and not re.match(r'^[a-zA-Z0-9._-]+$', username):
-            raise ValueError(f"Invalid username: {username}")
+        if username:
+            if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9._-]*$', username):
+                raise ValueError(f"Invalid username format: {username}")
+            if ".." in username:
+                raise ValueError(f"Invalid username containing '..': {username}")
         self.username = username
         # Install spatial extension if possible (might not work in all envs without internet/pre-install)
         # We skip this for now as it's complex to setup in sandboxed envs.
@@ -36,7 +40,12 @@ class DataTool:
         Executes a SQL query and returns a list of dictionaries.
         """
         if self.username:
-            parquet_dir = f"/data/{self.username}/"
+            base_dir = Path("/data/")
+            parquet_dir_path = (base_dir / self.username).resolve()
+            if not parquet_dir_path.is_relative_to(base_dir):
+                raise ValueError(f"Path traversal detected: {self.username}")
+
+            parquet_dir = f"{parquet_dir_path}/"
             # Ensure the directory exists to avoid errors, even if it might be empty
             try:
                 os.makedirs(parquet_dir, exist_ok=True)
