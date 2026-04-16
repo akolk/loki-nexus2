@@ -48,6 +48,15 @@ def test_chat_flow(mock_run_agent):
     assert history[-2]["content"] == "Hello Agent"
     assert "Mocked Agent Response" in history[-1]["content"]
 
+    # 4. Delete history
+    response = client.delete("/history", headers={"x-forwarded-user": "test_api_user"})
+    assert response.status_code == 200
+
+    # 5. Verify history is empty
+    response = client.get("/history", headers={"x-forwarded-user": "test_api_user"})
+    assert response.status_code == 200
+    assert len(response.json()) == 0
+
 def test_job_scheduling():
     # Ensure user exists first (re-using client state if persistent, but safe to re-init)
     # We need to mock run_agent here too implicitly because /chat calls it
