@@ -147,13 +147,11 @@ def delete_history(
 ):
     try:
         user, _ = user_data
-        from sqlmodel import select
+        from sqlalchemy import delete
         from backend.models import ChatHistory
         
-        statement = select(ChatHistory).where(ChatHistory.user_id == user.id)
-        history = session.exec(statement).all()
-        for msg in history:
-            session.delete(msg)
+        statement = delete(ChatHistory).where(ChatHistory.user_id == user.id)
+        session.exec(statement)
         session.commit()
         return {"status": "History deleted"}
     except Exception as e:
