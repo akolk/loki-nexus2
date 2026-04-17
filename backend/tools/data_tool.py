@@ -18,8 +18,11 @@ class DataTool:
     def __init__(self, db_path: str = ":memory:", username: Optional[str] = None):
         self.con = duckdb.connect(db_path)
         # Sanitize username: only alphanumeric, underscores, hyphens, and dots
-        if username and not re.match(r'^[a-zA-Z0-9._-]+$', username):
-            raise ValueError(f"Invalid username: {username}")
+        if username:
+            if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9._-]*$', username):
+                raise ValueError(f"Invalid username: {username}")
+            if ".." in username:
+                raise ValueError(f"Invalid username: {username}")
         self.username = username
         # Cache the transformer for performance optimizations
         self.transformer = pyproj.Transformer.from_crs("EPSG:28992", "EPSG:4326", always_xy=True)
@@ -38,13 +41,20 @@ class DataTool:
         Executes a SQL query and returns a list of dictionaries.
         """
         if self.username:
-            parquet_dir = f"/data/{self.username}/"
+            import pathlib
+            base_dir = pathlib.Path("/data/")
+            parquet_dir = base_dir / self.username
+            if not parquet_dir.resolve().is_relative_to(base_dir.resolve()):
+                return [{"error": "Invalid directory access"}]
+
+            parquet_dir_str = str(parquet_dir) + "/"
+
             # Ensure the directory exists to avoid errors, even if it might be empty
             try:
-                os.makedirs(parquet_dir, exist_ok=True)
+                os.makedirs(parquet_dir_str, exist_ok=True)
             except PermissionError:
-                logger.warning(f"Could not create {parquet_dir} due to PermissionError")
-            sql_query = sql_query.replace("__PARQUET_DIR__", parquet_dir)
+                logger.warning(f"Could not create {parquet_dir_str} due to PermissionError")
+            sql_query = sql_query.replace("__PARQUET_DIR__", parquet_dir_str)
 
         # Enforce limit as integer
         try:

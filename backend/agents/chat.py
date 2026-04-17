@@ -251,15 +251,6 @@ def build_system_prompt(ctx: AgentDeps, toolsets: List = None) -> str:
     return f"{userinfo}\n\n" + sys_prompt(userinfo, memory_str)
 
 
-async def build_system_prompt_async(ctx: AgentDeps, toolsets: List = None) -> str:
-    """Build the complete system prompt including skills (async version)."""
-    soul = ctx.user_soul
-    memory = soul.preferences.get("memory", "") if soul.preferences else ""
-    memory_str = f"\nMemory about user: {memory}" if memory else ""
-    userinfo = f"User Preferences: {soul.preferences}. Communication Style: {soul.style}.{memory_str}"
-    
-    return f"{userinfo}\n\n" + sys_prompt(userinfo, memory_str)
-
 def get_result(exec_globals: Dict[str, Any], allowed_globals: set) -> Any:
     result = exec_globals.get("result")
 
@@ -295,7 +286,7 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
     ]
 
     try:
-        system_prompt = await build_system_prompt_async(deps, toolsets)
+        system_prompt = build_system_prompt(deps, toolsets)
         result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets, instructions=system_prompt)
         agent_response = result.output
         
@@ -388,7 +379,7 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
                 
                 try:
                     exec_globals = {"np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl}
-                    system_prompt = await build_system_prompt_async(deps, toolsets)
+                    system_prompt = build_system_prompt(deps, toolsets)
                     
                     result = await agent.run(
                         error_prompt, 
