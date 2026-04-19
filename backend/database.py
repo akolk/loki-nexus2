@@ -25,6 +25,7 @@ SQL_ECHO = os.environ.get("SQL_ECHO", "False").lower() in ("true", "1", "t")
 
 engine = create_engine(DATABASE_URL, echo=SQL_ECHO)
 
+
 def init_db() -> None:
     retries = 10
     while retries > 0:
@@ -37,6 +38,7 @@ def init_db() -> None:
             time.sleep(2)
             retries -= 1
     print("Failed to initialize database.")
+
 
 def get_session() -> Generator[Session, None, None]:
     with Session(engine) as session:

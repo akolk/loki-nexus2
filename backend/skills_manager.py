@@ -9,19 +9,19 @@ logger = logging.getLogger(__name__)
 
 class SkillsManager:
     """Manages skills loading from local directory or Git registry."""
-    
+
     def __init__(self, skills_dir: str = "/app/backend/skills", refresh_interval: int = 300):
         self.skills_dir = skills_dir
         self.refresh_interval = refresh_interval
         self._toolset: Optional[SkillsToolset] = None
         self._enabled = False
-        
+
         self._load_skills()
-    
+
     def _load_skills(self) -> None:
         """Load skills from registry or local directory."""
         skills_registry_url = os.environ.get("SKILLS_REGISTRY")
-        
+
         if skills_registry_url:
             logger.info(f"Loading skills from registry: {skills_registry_url}")
             self._load_from_registry(skills_registry_url)
@@ -30,7 +30,7 @@ class SkillsManager:
             self._load_from_directory()
         else:
             logger.info("No skills registry configured and local skills directory not found, skipping skills")
-    
+
     def _load_from_registry(self, registry_url: str) -> None:
         """Load skills from a Git registry."""
         try:
@@ -44,7 +44,7 @@ class SkillsManager:
                     max_depth=3,
                     script_executor=LocalSkillScriptExecutor()
                 )
-            
+
             if skills:
                 self._toolset = SkillsToolset(skills=skills)
                 logger.info(f"Loaded {len(skills)} skills from registry")
@@ -53,7 +53,7 @@ class SkillsManager:
                 logger.warning("No skills found in registry")
         except Exception as e:
             logger.error(f"Failed to load skills from registry: {e}")
-    
+
     def _load_from_directory(self) -> None:
         """Load skills from local directory."""
         skills = discover_skills(
@@ -62,18 +62,18 @@ class SkillsManager:
             max_depth=3,
             script_executor=LocalSkillScriptExecutor()
         )
-        
+
         if skills:
             self._toolset = SkillsToolset(skills=skills)
             logger.info(f"Loaded {len(skills)} skills from local directory")
             self._enabled = True
         else:
             logger.warning("No skills found in local directory")
-    
+
     def get_toolset(self) -> Optional[SkillsToolset]:
         """Get the current toolset."""
         return self._toolset
-    
+
     def refresh(self) -> None:
         """Force a refresh of skills."""
         logger.info("Refreshing skills...")

@@ -31,13 +31,13 @@ def create_default_metadata_jobs():
     from backend.database_metadata import get_metadata_session
     from backend.models_metadata import Job
     from sqlmodel import select
-    
+
     session = get_metadata_session()
     try:
         existing_jobs = session.exec(select(Job)).all()
-        
+
         job_names = [j.name for j in existing_jobs]
-        
+
         if "PDOK Metadata Sync" not in job_names:
             create_metadata_job(
                 name="PDOK Metadata Sync",
@@ -48,7 +48,7 @@ def create_default_metadata_jobs():
                 enabled=True
             )
             logger.info("Created default PDOK Metadata Sync job")
-        
+
         if "CBS Metadata Sync" not in job_names:
             create_metadata_job(
                 name="CBS Metadata Sync",
@@ -59,7 +59,7 @@ def create_default_metadata_jobs():
                 enabled=True
             )
             logger.info("Created default CBS Metadata Sync job")
-            
+
     except Exception as e:
         logger.warning(f"Could not create default jobs: {e}")
     finally:
@@ -70,26 +70,26 @@ def create_default_metadata_jobs():
 async def lifespan(app: FastAPI):
     init_db()
     start_scheduler()
-    
+
     try:
         from backend.skills_manager import init_skills_manager
         skills_refresh = int(os.environ.get("SKILLS_REFRESH_INTERVAL", "300"))
         init_skills_manager(refresh_interval=skills_refresh)
     except Exception as e:
         logger.warning(f"Could not initialize skills manager: {e}")
-    
+
     try:
         create_metadata_tables()
     except Exception as e:
         logger.warning(f"Could not initialize metadata DB: {e}")
-    
+
     try:
         start_metadata_scheduler()
-        
+
         create_default_metadata_jobs()
     except Exception as e:
         logger.warning(f"Could not start metadata scheduler: {e}")
-    
+
     yield
     scheduler.shutdown()
 

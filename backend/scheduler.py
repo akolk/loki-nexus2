@@ -63,20 +63,20 @@ def start_scheduler() -> None:
 
 class JobExecutor:
     """Base class for job executors."""
-    
+
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-    
+
     async def execute(self) -> str:
         raise NotImplementedError("Subclasses must implement execute()")
 
 
 class MetadataSyncExecutor(JobExecutor):
     """Executor for metadata synchronization jobs."""
-    
+
     async def execute(self) -> str:
         source = self.config.get("source", "")
-        
+
         if source == "pdok":
             from backend.jobs.fetchers.pdok import fetch_pdok_metadata
             result = await fetch_pdok_metadata()
@@ -85,7 +85,7 @@ class MetadataSyncExecutor(JobExecutor):
             result = await fetch_cbs_metadata()
         else:
             result = f"Unknown source: {source}"
-        
+
         return result
 
 
@@ -93,15 +93,15 @@ async def run_metadata_job(job_id: int):
     """Execute a metadata job and record the result."""
     from backend.database_metadata import get_metadata_session
     from backend.models_metadata import Job, JobRun
-    
+
     session = get_metadata_session()
-    
+
     try:
         job = session.get(Job, job_id)
         if not job:
             logger.error(f"Job {job_id} not found")
             return
-        
+
         job_run = JobRun(
             job_id=job_id,
             status="running"
@@ -109,27 +109,27 @@ async def run_metadata_job(job_id: int):
         session.add(job_run)
         session.commit()
         session.refresh(job_run)
-        
+
         logger.info(f"Starting job {job.name} (ID: {job_id})")
-        
+
         try:
             executor = get_metadata_executor(job)
             result = await executor.execute()
-            
+
             job_run.status = "completed"
             job_run.completed_at = datetime.utcnow()
             job_run.result_summary = result
-            
+
             job.last_run = datetime.utcnow()
-            
+
         except Exception as e:
             logger.error(f"Error executing job {job_id}: {e}")
             job_run.status = "failed"
             job_run.completed_at = datetime.utcnow()
             job_run.error_message = str(e)
-        
+
         session.commit()
-        
+
     finally:
         session.close()
 
@@ -137,17 +137,17 @@ async def run_metadata_job(job_id: int):
 def get_metadata_executor(job) -> JobExecutor:
     """Get the appropriate executor for a metadata job."""
     config = job.get_config()
-    
+
     if job.job_type == "METADATA_SYNC":
         return MetadataSyncExecutor(config)
-    
+
     raise ValueError(f"Unknown job type: {job.job_type}")
 
 
 def add_metadata_job_to_scheduler(job):
     """Add or update a metadata job in the APScheduler."""
     job_id = job.id
-    
+
     if job.schedule_type == "INTERVAL" and job.interval_seconds:
         scheduler.add_job(
             run_metadata_job,
@@ -191,18 +191,18 @@ def start_metadata_scheduler():
     """Start the metadata scheduler and load jobs from DB."""
     from backend.database_metadata import get_metadata_session
     from backend.models_metadata import Job
-    
+
     session = get_metadata_session()
-    
+
     try:
-        jobs = session.exec(select(Job).where(Job.enabled == True)).all()
-        
+        jobs = session.exec(select(Job).where(Job.enabled)).all()
+
         for job in jobs:
             if job.schedule_type != "ONCE":
                 add_metadata_job_to_scheduler(job)
-        
+
         logger.info("Metadata jobs loaded into scheduler.")
-        
+
     finally:
         session.close()
 
@@ -219,9 +219,9 @@ def create_metadata_job(
     """Create a new metadata job and add it to the scheduler."""
     from backend.database_metadata import get_metadata_session
     from backend.models_metadata import Job
-    
+
     session = get_metadata_session()
-    
+
     try:
         job = Job(
             name=name,
@@ -232,16 +232,16 @@ def create_metadata_job(
             enabled=enabled
         )
         job.set_config(config)
-        
+
         session.add(job)
         session.commit()
         session.refresh(job)
-        
+
         if enabled and schedule_type != "ONCE":
             add_metadata_job_to_scheduler(job)
-        
+
         return job
-        
+
     finally:
         session.close()
 
@@ -249,12 +249,12 @@ def create_metadata_job(
 def delete_metadata_job(job_id: int):
     """Delete a metadata job from the scheduler and DB."""
     remove_metadata_job_from_scheduler(job_id)
-    
+
     from backend.database_metadata import get_metadata_session
     from backend.models_metadata import Job
-    
+
     session = get_metadata_session()
-    
+
     try:
         job = session.get(Job, job_id)
         if job:

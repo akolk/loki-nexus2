@@ -4,6 +4,8 @@ from sqlmodel import SQLModel, Field, JSON
 from pydantic import BaseModel
 
 # User & Soul
+
+
 class Soul(BaseModel):
     """
     Represents the user's soul/context/preferences.
@@ -14,6 +16,7 @@ class Soul(BaseModel):
     preferences: Dict[str, Any] = {}
     style: str = "concise"  # e.g. "concise", "detailed", "technical"
 
+
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(index=True, unique=True)
@@ -22,6 +25,8 @@ class User(SQLModel, table=True):
     soul_data: Dict[str, Any] = Field(default_factory=dict, sa_type=JSON)
 
 # Research Artifacts
+
+
 class ResearchStep(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
@@ -30,12 +35,14 @@ class ResearchStep(SQLModel, table=True):
     thought_process: str
     code_generated: Optional[str] = None
     output_summary: str
-    output_metadata: Dict[str, Any] = Field(default_factory=dict, sa_type=JSON) # e.g. row_count, execution_time
+    output_metadata: Dict[str, Any] = Field(default_factory=dict, sa_type=JSON)  # e.g. row_count, execution_time
 
 # Chat History
+
+
 class ChatHistory(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    role: str # "user" or "model"
+    role: str  # "user" or "model"
     content: str

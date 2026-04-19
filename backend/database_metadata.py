@@ -33,12 +33,12 @@ async def init_metadata_db():
 
 def create_metadata_tables():
     from backend.models_metadata import MetadataSource, MetadataEndpoint, Job, JobRun
-    
+
     try:
         with metadata_engine.begin() as conn:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             SQLModel.metadata.create_all(bind=conn)
-        
+
         logger.info("Metadata tables created successfully.")
     except Exception as e:
         import traceback

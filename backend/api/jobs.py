@@ -21,12 +21,11 @@ class JobRequest(BaseModel):
 def schedule_job(
     job: JobRequest,
     x_forwarded_user: str = Header("unknown_user", alias="x-forwarded-user"),
-    session = Depends(get_session)
+    session=Depends(get_session)
 ) -> Dict[str, str]:
     try:
         from sqlmodel import select
-        from backend.models import User
-        
+
         statement = select(User).where(User.username == x_forwarded_user)
         user = session.exec(statement).first()
 
