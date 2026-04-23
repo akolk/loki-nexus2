@@ -26,15 +26,15 @@ async def generate_embedding(text: str) -> List[float]:
     """
     try:
         client = get_openai_client()
-        
+
         response = await client.embeddings.create(
             model="text-embedding-3-small",
             input=text
         )
-        
+
         embedding = response.data[0].embedding
         return embedding
-        
+
     except Exception as e:
         logger.error(f"Error generating embedding: {e}")
         raise
@@ -46,15 +46,15 @@ async def generate_embeddings_batch(texts: List[str]) -> List[List[float]]:
     """
     try:
         client = get_openai_client()
-        
+
         response = await client.embeddings.create(
             model="text-embedding-3-small",
             input=texts
         )
-        
+
         embeddings = [item.embedding for item in sorted(response.data, key=lambda x: x.index)]
         return embeddings
-        
+
     except Exception as e:
         logger.error(f"Error generating embeddings batch: {e}")
         raise

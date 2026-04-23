@@ -4,9 +4,11 @@ from datetime import datetime
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+
 def quarter_code(dt: datetime) -> int:
     q = (dt.month - 1) // 3 + 1
     return dt.year * 100 + q + 12
+
 
 def fetch_json(url: str, timeout: float = 20.0, retries: int = 3, backoff: float = 0.8):
     last_err = None
@@ -21,6 +23,7 @@ def fetch_json(url: str, timeout: float = 20.0, retries: int = 3, backoff: float
             last_err = e
             time.sleep(backoff * (2 ** i))
     raise RuntimeError(str(last_err))
+
 
 purchase_price = 350000
 province = "GELDERLAND"

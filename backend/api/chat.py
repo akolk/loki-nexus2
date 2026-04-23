@@ -27,7 +27,7 @@ class ResearchResponse(BaseModel):
 async def deep_research_endpoint(
     request: ResearchRequest,
     user_data: Tuple[User, Soul] = Depends(get_current_user),
-    session = Depends(get_session)
+    session=Depends(get_session)
 ) -> ResearchResponse:
     try:
         user, soul = user_data
@@ -55,7 +55,7 @@ async def chat_endpoint(
     mcp_type: Optional[str] = Form(None),
     skill_files: Optional[List[UploadFile]] = File(None),
     user_data: Tuple[User, Soul] = Depends(get_current_user),
-    session = Depends(get_session)
+    session=Depends(get_session)
 ) -> Dict[str, Any]:
     try:
         user, soul = user_data
@@ -96,7 +96,7 @@ async def chat_endpoint(
         error = agent_out["response"].get("error", "Geen fouten tijdens ophalen van antwoord.")
         reasoning = agent_out["response"].get("reasoning", None)
         usage = agent_out.get("usage", None)
-        
+
         if reasoning:
             logger.info(f"Reasoning: {reasoning}")
 
@@ -118,12 +118,12 @@ async def chat_endpoint(
 @router.get("/history")
 def get_history(
     x_forwarded_user: str = Header("unknown_user", alias="x-forwarded-user"),
-    session = Depends(get_session)
+    session=Depends(get_session)
 ):
     try:
         from sqlmodel import select
         from backend.models import User, ChatHistory
-        
+
         statement = select(User).where(User.username == x_forwarded_user)
         user = session.exec(statement).first()
 
@@ -143,13 +143,13 @@ def get_history(
 @router.delete("/history")
 def delete_history(
     user_data: Tuple[User, Soul] = Depends(get_current_user),
-    session = Depends(get_session)
+    session=Depends(get_session)
 ):
     try:
         user, _ = user_data
         from sqlalchemy import delete
         from backend.models import ChatHistory
-        
+
         statement = delete(ChatHistory).where(ChatHistory.user_id == user.id)
         session.exec(statement)
         session.commit()
@@ -168,13 +168,13 @@ class ExplainRequest(BaseModel):
 async def explain_code(
     request: ExplainRequest,
     user_data: Tuple[User, Soul] = Depends(get_current_user),
-    session = Depends(get_session)
+    session=Depends(get_session)
 ) -> Dict[str, Any]:
     """Explain code using LLM."""
     try:
         user, soul = user_data
-        
-        prompt = f"""Explain the following {request.language} code to a user who may not be familiar with programming. 
+
+        prompt = f"""Explain the following {request.language} code to a user who may not be familiar with programming.
 Be very explicit and detailed. Focus on:
 - What the code does (step by step)
 - How it works (explain the logic)
@@ -193,12 +193,12 @@ Provide a detailed explanation in Dutch (the user's language)."""
             db_session=session,
             user_id=user.id
         )
-        
+
         from backend.agents.chat import run_agent
         result = await run_agent(prompt, deps)
-        
+
         explanation = result.get("response", {}).get("answer", "No explanation available")
-        
+
         return {"explanation": explanation}
     except Exception as e:
         logger.error(f"Error in explain_code: {e}", exc_info=True)

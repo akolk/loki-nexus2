@@ -26,14 +26,23 @@ def map_content_to_frontend(content):
             content = content.to_crs("EPSG:4326")
 
         # Convert datetime columns to strings before serialization
-        for col in content.select_dtypes(include=['datetime64', 'datetimetz']).columns:
+        for col in content.select_dtypes(
+            include=[
+                'datetime64',
+                'datetimetz']).columns:
             content[col] = content[col].astype(str)
 
-        # Handle NaNs (replace with None so it serializes to json null instead of string "")
+        # Handle NaNs (replace with None so it serializes to json null instead
+        # of string "")
         content = content.where(pd.notnull(content), None)
 
         geojson_data = json.loads(content.to_json(drop_id=True))
-        return {"type": "geojson_map", "content": {"features": geojson_data.get("features", [])}}
+        return {
+            "type": "geojson_map",
+            "content": {
+                "features": geojson_data.get(
+                    "features",
+                    [])}}
 
     elif isinstance(content, pd.DataFrame):
         html_table = content.to_html(classes="dataframe-table", index=False)
@@ -41,17 +50,28 @@ def map_content_to_frontend(content):
 
     elif isinstance(content, POLARS_DF_TYPE):
         # Convert Polars to Pandas to reuse to_html
-        html_table = content.to_pandas().to_html(classes="dataframe-table", index=False)
+        html_table = content.to_pandas().to_html(
+            classes="dataframe-table", index=False)
         return {"type": "dataframe", "content": html_table}
 
     elif isinstance(content, PLOTLY_FIG_TYPE):
         return {"type": "plotly", "content": content.to_json()}
 
     elif isinstance(content, dict):
-        if content.get("type") in ["geojson_map", "dataframe", "picture", "html", "plotly", "dict", "download"]:
+        if content.get("type") in [
+            "geojson_map",
+            "dataframe",
+            "picture",
+            "html",
+            "plotly",
+            "dict",
+                "download"]:
             return content
         return {"type": content.get("type"), "content": content}
     elif isinstance(content, str):
-        return {"answer": content }
+        return {"answer": content}
     else:
-        return {"type": "error", "content": f"Error: unknown datatype {type(content)}."}
+        return {
+            "type": "error",
+            "content": f"Error: unknown datatype {
+                type(content)}."}

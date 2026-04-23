@@ -20,11 +20,11 @@ router = APIRouter(prefix="/metadata", tags=["metadata"])
 def list_skills() -> Dict[str, Any]:
     """List loaded skills from the skills directory."""
     from backend.skills_manager import get_skills_manager
-    
+
     manager = get_skills_manager()
     if not manager:
         return {"skills_dir": None, "enabled": False, "skills": []}
-    
+
     toolsets = manager.get_toolsets()
     skills = []
     for ts in toolsets:
@@ -33,7 +33,7 @@ def list_skills() -> Dict[str, Any]:
             "prefix": prefix,
             "toolset_type": type(ts).__name__
         })
-    
+
     return {
         "skills_dir": manager.skills_dir,
         "enabled": manager._enabled,
@@ -46,11 +46,11 @@ def list_skills() -> Dict[str, Any]:
 def refresh_skills() -> Dict[str, str]:
     """Force refresh skills from the skills directory."""
     from backend.skills_manager import get_skills_manager
-    
+
     manager = get_skills_manager()
     if not manager:
         raise HTTPException(status_code=404, detail="Skills manager not initialized")
-    
+
     manager.force_refresh()
     return {"status": "Skills refreshed"}
 
@@ -69,7 +69,7 @@ class MetadataJobRequest(BaseModel):
 def create_metadata_job(job_req: MetadataJobRequest) -> Dict[str, Any]:
     try:
         config = {"source": job_req.source}
-        
+
         job = metadata_create_job(
             name=job_req.name,
             job_type=job_req.job_type,
@@ -79,7 +79,7 @@ def create_metadata_job(job_req: MetadataJobRequest) -> Dict[str, Any]:
             cron_expression=job_req.cron_expression,
             enabled=job_req.enabled
         )
-        
+
         return {
             "status": "Job created",
             "job_id": job.id,
@@ -96,7 +96,7 @@ def list_metadata_jobs() -> List[Dict[str, Any]]:
     from backend.database_metadata import get_metadata_session
     from backend.models_metadata import Job
     from sqlmodel import select
-    
+
     session = get_metadata_session()
     try:
         jobs = session.exec(select(Job)).all()
@@ -160,7 +160,7 @@ def list_metadata_sources() -> List[Dict[str, Any]]:
     from backend.database_metadata import get_metadata_session
     from backend.models_metadata import MetadataSource
     from sqlmodel import select
-    
+
     session = get_metadata_session()
     try:
         sources = session.exec(select(MetadataSource)).all()
@@ -187,11 +187,11 @@ def get_metadata_counts() -> Dict[str, Any]:
     from backend.database_metadata import get_metadata_session
     from backend.models_metadata import MetadataSource, MetadataEndpoint
     from sqlmodel import select, func
-    
+
     session = get_metadata_session()
     try:
         counts = []
-        
+
         stmt = (
             select(
                 MetadataSource.id,
@@ -212,7 +212,7 @@ def get_metadata_counts() -> Dict[str, Any]:
                 "source_type": row.source_type,
                 "endpoint_count": row.endpoint_count or 0
             })
-        
+
         return {"sources": counts}
     except Exception as e:
         logger.error(f"Error getting counts: {e}", exc_info=True)

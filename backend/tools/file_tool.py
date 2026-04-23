@@ -1,8 +1,8 @@
-import os
 from pathlib import Path
 
 WORKSPACE_DIR = Path("backend/workspace")
 WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
+
 
 def _get_safe_path(filepath: str) -> Path:
     """
@@ -14,9 +14,11 @@ def _get_safe_path(filepath: str) -> Path:
 
     # Check if the resolved path is within the workspace directory
     if not safe_path.is_relative_to(WORKSPACE_DIR.resolve()):
-        raise ValueError(f"Access denied: {filepath} is outside the workspace.")
+        raise ValueError(
+            f"Access denied: {filepath} is outside the workspace.")
 
     return safe_path
+
 
 def read_file(filepath: str) -> str:
     """Reads the content of a file from the workspace."""
@@ -31,6 +33,7 @@ def read_file(filepath: str) -> str:
         return str(ve)
     except Exception as e:
         return f"Error reading file: {e}"
+
 
 def write_file(filepath: str, content: str) -> str:
     """Writes content to a file in the workspace."""

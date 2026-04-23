@@ -9,20 +9,23 @@ from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
+
 class DataTool:
     """
     Tool for querying data using DuckDB with spatial capabilities.
     Enforces lazy loading/limiting and predicate pushdown.
     """
 
-    def __init__(self, db_path: str = ":memory:", username: Optional[str] = None):
+    def __init__(self, db_path: str = ":memory:",
+                 username: Optional[str] = None):
         self.con = duckdb.connect(db_path)
         # Sanitize username: only alphanumeric, underscores, hyphens, and dots
         if username and not re.match(r'^[a-zA-Z0-9._-]+$', username):
             raise ValueError(f"Invalid username: {username}")
         self.username = username
         # Cache the transformer for performance optimizations
-        self.transformer = pyproj.Transformer.from_crs("EPSG:28992", "EPSG:4326", always_xy=True)
+        self.transformer = pyproj.Transformer.from_crs(
+            "EPSG:28992", "EPSG:4326", always_xy=True)
         # Install spatial extension if possible (might not work in all envs without internet/pre-install)
         # We skip this for now as it's complex to setup in sandboxed envs.
         # We rely on pure python projection via pyproj.
@@ -33,17 +36,20 @@ class DataTool:
         except Exception:
             pass
 
-    def execute_query(self, sql_query: str, limit: int = 100) -> List[Dict[str, Any]]:
+    def execute_query(self, sql_query: str,
+                      limit: int = 100) -> List[Dict[str, Any]]:
         """
         Executes a SQL query and returns a list of dictionaries.
         """
         if self.username:
             parquet_dir = f"/data/{self.username}/"
-            # Ensure the directory exists to avoid errors, even if it might be empty
+            # Ensure the directory exists to avoid errors, even if it might be
+            # empty
             try:
                 os.makedirs(parquet_dir, exist_ok=True)
             except PermissionError:
-                logger.warning(f"Could not create {parquet_dir} due to PermissionError")
+                logger.warning(
+                    f"Could not create {parquet_dir} due to PermissionError")
             sql_query = sql_query.replace("__PARQUET_DIR__", parquet_dir)
 
         # Enforce limit as integer
@@ -61,7 +67,7 @@ class DataTool:
             # DuckDB executes lazily until fetch
             result = self.con.sql(sql_query)
             # Fetch limited results
-            df = result.df() # DuckDB relation -> Pandas DataFrame
+            df = result.df()  # DuckDB relation -> Pandas DataFrame
 
             # Transform coordinates if present (EPSG:28992 -> WGS84)
             df = self._transform_coordinates(df)
@@ -83,13 +89,18 @@ class DataTool:
             x_num = pd.to_numeric(df['x'], errors='coerce')
             y_num = pd.to_numeric(df['y'], errors='coerce')
 
-            mask = (x_num > 0) & (x_num < 300000) & (y_num > 300000) & (y_num < 650000)
+            mask = (
+                x_num > 0) & (
+                x_num < 300000) & (
+                y_num > 300000) & (
+                y_num < 650000)
 
             if mask.any():
                 # Apply transformation only on valid rows
                 # NOTE: EPSG:4326 is lon/lat order when always_xy=True
                 # transformer.transform with always_xy=True returns (lon, lat)
-                lon, lat = self.transformer.transform(x_num[mask].values, y_num[mask].values)
+                lon, lat = self.transformer.transform(
+                    x_num[mask].values, y_num[mask].values)
 
                 # Initialize columns if they don't exist
                 if 'wgs84_lon' not in df.columns:
@@ -103,6 +114,8 @@ class DataTool:
         return df
 
 # Standalone function for the agent to call
+
+
 def run_data_query(query: str, username: Optional[str] = None) -> str:
     """
     Runs a DuckDB SQL query.
@@ -112,9 +125,11 @@ def run_data_query(query: str, username: Optional[str] = None) -> str:
     """
     tool = DataTool(username=username)
     # Create a dummy table for testing if not exists
-    tool.con.execute("CREATE TABLE IF NOT EXISTS test_data (id INTEGER, x INTEGER, y INTEGER, value VARCHAR)")
+    tool.con.execute(
+        "CREATE TABLE IF NOT EXISTS test_data (id INTEGER, x INTEGER, y INTEGER, value VARCHAR)")
     # Insert Amersfoort coordinates (RD New center)
-    tool.con.execute("INSERT INTO test_data VALUES (1, 155000, 463000, 'Test Point')")
+    tool.con.execute(
+        "INSERT INTO test_data VALUES (1, 155000, 463000, 'Test Point')")
 
     results = tool.execute_query(query)
     return str(results)
