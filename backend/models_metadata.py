@@ -27,7 +27,9 @@ class MetadataEndpoint(SQLModel, table=True):
     description: Optional[str] = None
     api_type: str = Field(max_length=100)  # "OGC API Features", "CBS OData", etc.
     extra_metadata: Optional[str] = Field(default=None)  # JSON string
-    embedding: Optional[List[float]] = Field(default=None, sa_column=Column(Vector(1536)))
+    embedding: Optional[List[float]] = Field(
+        default=None, sa_column=Column(Vector(1536))
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

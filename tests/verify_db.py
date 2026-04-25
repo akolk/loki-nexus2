@@ -2,6 +2,7 @@ from backend.database import init_db, engine
 from backend.models import User, ResearchStep, ChatHistory
 from sqlmodel import Session
 
+
 def verify_db_setup():
     print("Initializing database...")
     init_db()
@@ -21,7 +22,7 @@ def verify_db_setup():
             query="Analyze data",
             thought_process="I should check the data distribution.",
             output_summary="Data is skewed.",
-            output_metadata={"rows": 100}
+            output_metadata={"rows": 100},
         )
         session.add(step)
         session.commit()
@@ -29,17 +30,14 @@ def verify_db_setup():
         print(f"Created research step: {step}")
 
         # Create a chat history entry
-        chat = ChatHistory(
-            user_id=test_user.id,
-            role="user",
-            content="Hello"
-        )
+        chat = ChatHistory(user_id=test_user.id, role="user", content="Hello")
         session.add(chat)
         session.commit()
         session.refresh(chat)
         print(f"Created chat history: {chat}")
 
     print("Verification complete.")
+
 
 if __name__ == "__main__":
     verify_db_setup()

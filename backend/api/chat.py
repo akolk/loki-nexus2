@@ -27,16 +27,12 @@ class ResearchResponse(BaseModel):
 async def deep_research_endpoint(
     request: ResearchRequest,
     user_data: Tuple[User, Soul] = Depends(get_current_user),
-    session=Depends(get_session)
+    session=Depends(get_session),
 ) -> ResearchResponse:
     try:
         user, soul = user_data
 
-        deps = AgentDeps(
-            user_soul=soul,
-            db_session=session,
-            user_id=user.id
-        )
+        deps = AgentDeps(user_soul=soul, db_session=session, user_id=user.id)
 
         agent_out = await run_research_agent(request.query, request.format, deps)
         return agent_out
@@ -55,7 +51,7 @@ async def chat_endpoint(
     mcp_type: Optional[str] = Form(None),
     skill_files: Optional[List[UploadFile]] = File(None),
     user_data: Tuple[User, Soul] = Depends(get_current_user),
-    session=Depends(get_session)
+    session=Depends(get_session),
 ) -> Dict[str, Any]:
     try:
         user, soul = user_data
@@ -73,7 +69,7 @@ async def chat_endpoint(
             user_id=user.id,
             mcp_url=mcp_url,
             mcp_type=mcp_type,
-            skill_files=skill_files
+            skill_files=skill_files,
         )
 
         final_message = message
@@ -91,9 +87,13 @@ async def chat_endpoint(
         response_text = agent_out["response"]["answer"]
         exec_result = agent_out["exec_result"]
         related = agent_out["response"].get("related", [])
-        disclaimer = agent_out["response"].get("disclaimer", "Dit antwoord heeft geen disclaimer.")
+        disclaimer = agent_out["response"].get(
+            "disclaimer", "Dit antwoord heeft geen disclaimer."
+        )
         code = agent_out["response"].get("code", "Dit antwoord heeft geen code.")
-        error = agent_out["response"].get("error", "Geen fouten tijdens ophalen van antwoord.")
+        error = agent_out["response"].get(
+            "error", "Geen fouten tijdens ophalen van antwoord."
+        )
         reasoning = agent_out["response"].get("reasoning", None)
         usage = agent_out.get("usage", None)
 
@@ -107,7 +107,16 @@ async def chat_endpoint(
         session.add(model_msg)
         session.commit()
 
-        return {"response": response_text, "exec_result": exec_result, "related": related, "code": code, "disclaimer": disclaimer, "error": error, "reasoning": reasoning, "usage": usage}
+        return {
+            "response": response_text,
+            "exec_result": exec_result,
+            "related": related,
+            "code": code,
+            "disclaimer": disclaimer,
+            "error": error,
+            "reasoning": reasoning,
+            "usage": usage,
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -118,7 +127,7 @@ async def chat_endpoint(
 @router.get("/history")
 def get_history(
     x_forwarded_user: str = Header("unknown_user", alias="x-forwarded-user"),
-    session=Depends(get_session)
+    session=Depends(get_session),
 ):
     try:
         from sqlmodel import select
@@ -130,7 +139,11 @@ def get_history(
         if not user:
             return []
 
-        statement = select(ChatHistory).where(ChatHistory.user_id == user.id).order_by(ChatHistory.timestamp)
+        statement = (
+            select(ChatHistory)
+            .where(ChatHistory.user_id == user.id)
+            .order_by(ChatHistory.timestamp)
+        )
         history = session.exec(statement).all()
         return history
     except HTTPException:
@@ -143,7 +156,7 @@ def get_history(
 @router.delete("/history")
 def delete_history(
     user_data: Tuple[User, Soul] = Depends(get_current_user),
-    session=Depends(get_session)
+    session=Depends(get_session),
 ):
     try:
         user, _ = user_data
@@ -168,7 +181,7 @@ class ExplainRequest(BaseModel):
 async def explain_code(
     request: ExplainRequest,
     user_data: Tuple[User, Soul] = Depends(get_current_user),
-    session=Depends(get_session)
+    session=Depends(get_session),
 ) -> Dict[str, Any]:
     """Explain code using LLM."""
     try:
@@ -188,16 +201,15 @@ Code:
 
 Provide a detailed explanation in Dutch (the user's language)."""
 
-        deps = AgentDeps(
-            user_soul=soul,
-            db_session=session,
-            user_id=user.id
-        )
+        deps = AgentDeps(user_soul=soul, db_session=session, user_id=user.id)
 
         from backend.agents.chat import run_agent
+
         result = await run_agent(prompt, deps)
 
-        explanation = result.get("response", {}).get("answer", "No explanation available")
+        explanation = result.get("response", {}).get(
+            "answer", "No explanation available"
+        )
 
         return {"explanation": explanation}
     except Exception as e:

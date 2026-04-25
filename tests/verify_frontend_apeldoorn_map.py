@@ -4,9 +4,11 @@ import os
 import uvicorn
 from backend.main import app
 
+
 def run_server():
     # Run uvicorn in error log level so it doesn't clutter the test output too much
     uvicorn.run(app, host="127.0.0.1", port=8000, log_level="error")
+
 
 def verify_apeldoorn_map():
     print("Starting Uvicorn Server...")
@@ -68,7 +70,9 @@ def verify_apeldoorn_map():
             print("Post-it note with Leaflet map found!")
 
             # Skip taking screenshot to avoid artifact clutter in repository
-            print("Successfully verified Map Mode OFF (No screenshot taken to avoid artifacts).")
+            print(
+                "Successfully verified Map Mode OFF (No screenshot taken to avoid artifacts)."
+            )
 
             # --- SCENARIO 2: Map Mode ON ---
             print("\n--- Starting Scenario 2: Map Mode ON ---")
@@ -98,7 +102,9 @@ def verify_apeldoorn_map():
             page.click("button:has-text('Send')")
 
             # Wait for a map marker or feature to be added to the main map
-            print("Waiting for response and map update (this might take up to 60s for the LLM)...")
+            print(
+                "Waiting for response and map update (this might take up to 60s for the LLM)..."
+            )
             # A marker usually creates an img element with class leaflet-marker-icon,
             # or a GeoJSON point might be rendered as an SVG path or a marker.
             # We will wait for a .leaflet-marker-icon inside the #map-container
@@ -106,7 +112,9 @@ def verify_apeldoorn_map():
             print("Map marker found on the main map!")
 
             # Skip taking screenshot to avoid artifact clutter in repository
-            print("Successfully verified Map Mode ON (No screenshot taken to avoid artifacts).")
+            print(
+                "Successfully verified Map Mode ON (No screenshot taken to avoid artifacts)."
+            )
 
             browser.close()
 
@@ -117,6 +125,7 @@ def verify_apeldoorn_map():
         raise e
 
     print("\nFrontend Apeldoorn map verification passed successfully.")
+
 
 if __name__ == "__main__":
     verify_apeldoorn_map()

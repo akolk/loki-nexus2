@@ -8,10 +8,12 @@ import asyncio
 engine = create_engine("sqlite:///:memory:")
 SQLModel.metadata.create_all(engine)
 
+
 @pytest.fixture
 def db_session():
     with Session(engine) as session:
         yield session
+
 
 @pytest.mark.asyncio
 async def test_run_agent_execution_with_null_related(db_session):
@@ -22,20 +24,24 @@ async def test_run_agent_execution_with_null_related(db_session):
         answer="Answer without related questions.",
         related=None,
         code="result = {'data': 'test_data2', 'type': 'dict'}",
-        disclaimer="Mock disclaimer"
+        disclaimer="Mock disclaimer",
     )
 
-    with patch('backend.agents.chat.agent.run') as mock_run:
+    with patch("backend.agents.chat.agent.run") as mock_run:
+
         class MockResult:
             def __init__(self, output):
                 self.output = output
+
             def all_messages(self):
                 return []
+
         mock_run.return_value = MockResult(output=mock_agent_response)
         res = await run_agent("Test no related", deps)
 
         assert "related" in res["response"]
         assert res["response"]["related"] == []
+
 
 @pytest.mark.asyncio
 async def test_run_agent_execution(db_session):
@@ -47,15 +53,18 @@ async def test_run_agent_execution(db_session):
         answer="Here is the execution result.",
         related=["Q1?"],
         code="result = {'data': 'test_data', 'type': 'dict'}",
-        disclaimer="Mock disclaimer"
+        disclaimer="Mock disclaimer",
     )
 
-    with patch('backend.agents.chat.agent.run') as mock_run:
+    with patch("backend.agents.chat.agent.run") as mock_run:
+
         class MockResult:
             def __init__(self, output):
                 self.output = output
+
             def all_messages(self):
                 return []
+
         mock_run.return_value = MockResult(output=mock_agent_response)
         res = await run_agent("Test execution query", deps)
 
