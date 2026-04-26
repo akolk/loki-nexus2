@@ -5,10 +5,12 @@ from backend.agent import AgentDeps
 from backend.models import Soul
 import os
 
+
 def test_read_file_tool():
     # Attempt to read a non-existent file
     res = read_file("nonexistent_test_file.txt")
     assert "Error: File nonexistent_test_file.txt not found." in res
+
 
 def test_write_file_tool():
     res = write_file("test_write.txt", "Hello World")
@@ -18,10 +20,12 @@ def test_write_file_tool():
     res = read_file("test_write.txt")
     assert res == "Hello World"
 
+
 def test_run_data_query_tool():
     dt = DataTool("test_user")
     res = dt.execute_query("SELECT 'test' AS a")
-    assert res == [{'a': 'test'}]
+    assert res == [{"a": "test"}]
+
 
 def test_agent_deps_initialization():
     soul = Soul(user_id="1", username="test_user", style="concise")

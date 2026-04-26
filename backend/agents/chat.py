@@ -14,7 +14,16 @@ import geopandas as gpd
 import plotly.express as px
 import plotly.graph_objects as go
 from pydantic_ai import Agent, RunContext
-from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart, SystemPromptPart, ThinkingPart, ThinkingPartDelta
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    UserPromptPart,
+    SystemPromptPart,
+    ThinkingPart,
+    ThinkingPartDelta,
+)
 from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
 from sqlmodel import select
 from textwrap import dedent
@@ -35,14 +44,16 @@ elif os.environ.get("AZURE_OPENAI_API_KEY"):
 else:
     model = None
 
-model_settings = OpenAIResponsesModelSettings(
-    openai_reasoning_effort=os.environ.get("OPENAI_REASONING_EFFORT", "low"),
-    openai_reasoning_summary=os.environ.get("OPENAI_REASONING_SUMMARY", "auto"),
-    max_tokens=int(os.environ.get("OPENAI_MAX_TOKENS", "50000")),
-    model_config={
-        "max_retries": int(os.environ.get("OPENAI_MAX_RETRIES", "3"))
-    }
-) if model else None
+model_settings = (
+    OpenAIResponsesModelSettings(
+        openai_reasoning_effort=os.environ.get("OPENAI_REASONING_EFFORT", "low"),
+        openai_reasoning_summary=os.environ.get("OPENAI_REASONING_SUMMARY", "auto"),
+        max_tokens=int(os.environ.get("OPENAI_MAX_TOKENS", "50000")),
+        model_config={"max_retries": int(os.environ.get("OPENAI_MAX_RETRIES", "3"))},
+    )
+    if model
+    else None
+)
 
 level = "medior"
 
@@ -93,15 +104,17 @@ def sys_prompt(soul, memory) -> str:
 
 
 agent = Agent(
-    model,
-    deps_type=AgentDeps,
-    output_type=AgentResponse,
-    model_settings=model_settings
+    model, deps_type=AgentDeps, output_type=AgentResponse, model_settings=model_settings
 )
 
 
 @agent.tool
-def pdok_ogc_api(ctx: RunContext[AgentDeps], ogc_dataset: str, top_k: int = 5, filter_geojson: bool = True) -> str:
+def pdok_ogc_api(
+    ctx: RunContext[AgentDeps],
+    ogc_dataset: str,
+    top_k: int = 5,
+    filter_geojson: bool = True,
+) -> str:
     """Query the metadata database for the best matching OGC API endpoints. Use bbox of viewport.
 
     Args:
@@ -110,9 +123,14 @@ def pdok_ogc_api(ctx: RunContext[AgentDeps], ogc_dataset: str, top_k: int = 5, f
         filter_geojson: If True (default), only return GeoJSON-capable endpoints (OGC API Features with /collections)
     """
     from backend.tools.metadata_lookup import find_endpoint
+
     top_k = min(max(1, top_k), 20)
-    logger.info(f"OGC_API: {ogc_dataset}, top_k={top_k}, filter_geojson={filter_geojson}")
-    return find_endpoint(ogc_dataset, source_type="pdok", top_k=top_k, filter_geojson=filter_geojson)
+    logger.info(
+        f"OGC_API: {ogc_dataset}, top_k={top_k}, filter_geojson={filter_geojson}"
+    )
+    return find_endpoint(
+        ogc_dataset, source_type="pdok", top_k=top_k, filter_geojson=filter_geojson
+    )
 
 
 @agent.tool
@@ -124,6 +142,7 @@ def cbs_api(ctx: RunContext[AgentDeps], cbs_dataset: str, top_k: int = 5) -> str
         top_k: Number of results to return (default 5, max 20)
     """
     from backend.tools.metadata_lookup import find_endpoint
+
     top_k = min(max(1, top_k), 20)
     logger.info(f"CBS_API: {cbs_dataset}, top_k={top_k}")
     return find_endpoint(cbs_dataset, source_type="cbs", top_k=top_k)
@@ -169,7 +188,9 @@ async def update_soul(ctx: RunContext[AgentDeps], new_information: str) -> str:
     from backend.models import User
 
     user = ctx.deps.db_session.get(User, ctx.deps.user_id)
-    logger.info(f"Updating soul for user_id={ctx.deps.user_id} with new information: {new_information}")
+    logger.info(
+        f"Updating soul for user_id={ctx.deps.user_id} with new information: {new_information}"
+    )
     if not user:
         return "User not found"
 
@@ -195,10 +216,13 @@ Respond only with valid JSON."""
         response = await client.chat.completions.create(
             model="o3-mini",
             messages=[
-                {"role": "system", "content": "You update user profiles. Return ONLY valid JSON, no markdown, no explanation."},
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system",
+                    "content": "You update user profiles. Return ONLY valid JSON, no markdown, no explanation.",
+                },
+                {"role": "user", "content": prompt},
             ],
-            max_completion_tokens=500
+            max_completion_tokens=500,
         )
 
         content = response.choices[0].message.content.strip()
@@ -218,7 +242,7 @@ Respond only with valid JSON."""
         user.soul_data = {
             "style": updated_data.get("style", current_style),
             "preferences": current_preferences,
-            "memory": updated_data.get("memory", "")
+            "memory": updated_data.get("memory", ""),
         }
         logger.info(f"Updated soul for user {ctx.deps.user_id}: {user.soul_data}")
 
@@ -281,7 +305,12 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
     toolset = get_skills_toolsets()
     toolsets = [toolset] if toolset else []
 
-    statement = select(ChatHistory).where(ChatHistory.user_id == deps.user_id).order_by(ChatHistory.timestamp.desc()).limit(10)
+    statement = (
+        select(ChatHistory)
+        .where(ChatHistory.user_id == deps.user_id)
+        .order_by(ChatHistory.timestamp.desc())
+        .limit(10)
+    )
 
     history_records = deps.db_session.exec(statement).all()
     history_records = list(history_records)[::-1]
@@ -290,18 +319,32 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
 
     for record in history_records:
         if record.role == "user":
-            message_history.append(ModelRequest(parts=[UserPromptPart(content=record.content)]))
+            message_history.append(
+                ModelRequest(parts=[UserPromptPart(content=record.content)])
+            )
         elif record.role == "model":
-            message_history.append(ModelResponse(parts=[TextPart(content=record.content)]))
+            message_history.append(
+                ModelResponse(parts=[TextPart(content=record.content)])
+            )
 
     message_history = [
-        m for m in message_history
-        if not (isinstance(m, ModelRequest) and any(isinstance(p, SystemPromptPart) for p in m.parts))
+        m
+        for m in message_history
+        if not (
+            isinstance(m, ModelRequest)
+            and any(isinstance(p, SystemPromptPart) for p in m.parts)
+        )
     ]
 
     try:
         system_prompt = await build_system_prompt_async(deps, toolsets)
-        result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets, instructions=system_prompt)
+        result = await agent.run(
+            query,
+            deps=deps,
+            message_history=message_history,
+            toolsets=toolsets,
+            instructions=system_prompt,
+        )
         agent_response = result.output
 
         reasoning = None
@@ -309,7 +352,7 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
         logger.info(f"Agent response: {agent_response}")
         for msg in result.all_messages():
             # logger.info(f"Checking message for reasoning: {msg}")
-            if hasattr(msg, 'parts'):
+            if hasattr(msg, "parts"):
                 for part in msg.parts:
                     logger.info(f"Checking message part for reasoning: {part}")
                     if isinstance(part, ThinkingPart):
@@ -318,27 +361,45 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
                         if reasoning is None:
                             reasoning = ""
                         reasoning += part.content
-                    elif hasattr(part, 'content') and isinstance(part.content, str) and 'thinking' in part.content.lower():
+                    elif (
+                        hasattr(part, "content")
+                        and isinstance(part.content, str)
+                        and "thinking" in part.content.lower()
+                    ):
                         reasoning = part.content
 
-        if hasattr(result, 'usage') and callable(result.usage):
+        if hasattr(result, "usage") and callable(result.usage):
             usage_obj = result.usage()
             logger.info(f"Usage object: {usage_obj}, type: {type(usage_obj)}")
             if usage_obj:
                 usage = {
                     "input_tokens": usage_obj.input_tokens,
                     "output_tokens": usage_obj.output_tokens,
-                    "total_tokens": usage_obj.total_tokens if hasattr(usage_obj, 'total_tokens') else (usage_obj.input_tokens + usage_obj.output_tokens),
-                    "requests": usage_obj.requests
+                    "total_tokens": (
+                        usage_obj.total_tokens
+                        if hasattr(usage_obj, "total_tokens")
+                        else (usage_obj.input_tokens + usage_obj.output_tokens)
+                    ),
+                    "requests": usage_obj.requests,
                 }
                 logger.info(f"Parsed usage: {usage}")
 
-        logger.debug(f"agent_response={agent_response}, reasoning={reasoning}, usage={usage}")
+        logger.debug(
+            f"agent_response={agent_response}, reasoning={reasoning}, usage={usage}"
+        )
     except Exception as e:
         logger.error(f"Error executing agent in run_agent: {e}", exc_info=True)
         raise e
 
-    exec_globals = {"np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl}
+    exec_globals = {
+        "np": np,
+        "pd": pd,
+        "px": px,
+        "go": go,
+        "gpd": gpd,
+        "xgb": xgb,
+        "skl": skl,
+    }
     allowed_globals = set(exec_globals.keys())
 
     exec_result: Optional[Dict[str, Any]] = None
@@ -352,7 +413,7 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
         "timeout",
         "URLError",
         "ConnectionError",
-        "gaierror"
+        "gaierror",
     ]
 
     while retry_count <= max_retries:
@@ -367,7 +428,10 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
                     exec_result = map_content_to_frontend(result)
                     logger.debug(f"exec_result={exec_result}")
                 else:
-                    exec_result = {"type": "error", "content": "Agent code executed but did not set the 'result' variable."}
+                    exec_result = {
+                        "type": "error",
+                        "content": "Agent code executed but did not set the 'result' variable.",
+                    }
             else:
                 exec_result = {
                     "type": "answer",
@@ -375,8 +439,8 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
                         "answer": agent_response.answer,
                         "related": agent_response.related or [],
                         "disclaimer": agent_response.disclaimer,
-                        "code": agent_response.code
-                    }
+                        "code": agent_response.code,
+                    },
                 }
             break
         except Exception as e:
@@ -387,12 +451,22 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
 
             if retry_count < max_retries and is_retryable:
                 retry_count += 1
-                logger.info(f"Retrying with error context (attempt {retry_count}/{max_retries})")
+                logger.info(
+                    f"Retrying with error context (attempt {retry_count}/{max_retries})"
+                )
 
                 error_prompt = f"{query}\n\nHerstel fout: {exec_error}\n\nProbeer de code te corrigeren."
 
                 try:
-                    exec_globals = {"np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl}
+                    exec_globals = {
+                        "np": np,
+                        "pd": pd,
+                        "px": px,
+                        "go": go,
+                        "gpd": gpd,
+                        "xgb": xgb,
+                        "skl": skl,
+                    }
                     system_prompt = await build_system_prompt_async(deps, toolsets)
 
                     result = await agent.run(
@@ -400,17 +474,23 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
                         deps=deps,
                         message_history=message_history,
                         toolsets=toolsets,
-                        instructions=system_prompt
+                        instructions=system_prompt,
                     )
                     agent_response = result.output
                 except Exception as retry_error:
                     logger.error(f"Error in retry: {retry_error}")
-                    exec_result = {"type": "error", "content": f"Execution error: {exec_error}"}
+                    exec_result = {
+                        "type": "error",
+                        "content": f"Execution error: {exec_error}",
+                    }
                     break
             else:
                 if not is_retryable:
                     logger.warning(f"Non-retryable error, stopping: {exec_error}")
-                exec_result = {"type": "error", "content": f"Execution error: {exec_error}"}
+                exec_result = {
+                    "type": "error",
+                    "content": f"Execution error: {exec_error}",
+                }
                 break
 
     logger.debug(exec_result)
@@ -421,7 +501,7 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
         query=query,
         thought_process="[Agent Execution]",
         output_summary=str(exec_result),
-        output_metadata={"model": model_name_str}
+        output_metadata={"model": model_name_str},
     )
 
     deps.db_session.add(step)
@@ -434,8 +514,8 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
             "disclaimer": agent_response.disclaimer,
             "code": agent_response.code,
             "reasoning": reasoning or agent_response.reasoning,
-            "error": exec_error
+            "error": exec_error,
         },
         "exec_result": exec_result,
-        "usage": usage
+        "usage": usage,
     }

@@ -2,6 +2,7 @@ import os
 import duckdb
 from backend.tools.data_tool import DataTool
 
+
 def test_sql_injection():
     # Simulate a malicious username
     malicious_username = "'; CREATE TABLE injected (val TEXT); --"
@@ -23,10 +24,11 @@ def test_sql_injection():
     print(f"Tables in DB: {tables}")
     con.close()
 
-    if any('injected' in table for table in tables):
+    if any("injected" in table for table in tables):
         print("VULNERABILITY REPRODUCED: Table 'injected' was created!")
     else:
         print("Vulnerability not reproduced (or failed for other reasons).")
+
 
 if __name__ == "__main__":
     if os.path.exists("test.db"):

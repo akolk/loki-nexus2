@@ -7,7 +7,7 @@ import asyncio
 from backend.jobs.scheduler import (
     create_job as metadata_create_job,
     delete_job as metadata_delete_job,
-    run_job as metadata_run_job
+    run_job as metadata_run_job,
 )
 from backend.tools.metadata_lookup import search_metadata
 
@@ -28,17 +28,14 @@ def list_skills() -> Dict[str, Any]:
     toolsets = manager.get_toolsets()
     skills = []
     for ts in toolsets:
-        prefix = getattr(ts, '_prefix', '')
-        skills.append({
-            "prefix": prefix,
-            "toolset_type": type(ts).__name__
-        })
+        prefix = getattr(ts, "_prefix", "")
+        skills.append({"prefix": prefix, "toolset_type": type(ts).__name__})
 
     return {
         "skills_dir": manager.skills_dir,
         "enabled": manager._enabled,
         "last_refresh": manager._last_refresh,
-        "skills": skills
+        "skills": skills,
     }
 
 
@@ -77,14 +74,14 @@ def create_metadata_job(job_req: MetadataJobRequest) -> Dict[str, Any]:
             config=config,
             interval_seconds=job_req.interval_seconds,
             cron_expression=job_req.cron_expression,
-            enabled=job_req.enabled
+            enabled=job_req.enabled,
         )
 
         return {
             "status": "Job created",
             "job_id": job.id,
             "name": job.name,
-            "schedule_type": job.schedule_type
+            "schedule_type": job.schedule_type,
         }
     except Exception as e:
         logger.error(f"Error creating metadata job: {e}", exc_info=True)
@@ -110,7 +107,7 @@ def list_metadata_jobs() -> List[Dict[str, Any]]:
                 "cron_expression": j.cron_expression,
                 "enabled": j.enabled,
                 "last_run": j.last_run.isoformat() if j.last_run else None,
-                "next_run": j.next_run.isoformat() if j.next_run else None
+                "next_run": j.next_run.isoformat() if j.next_run else None,
             }
             for j in jobs
         ]
@@ -143,9 +140,7 @@ def run_metadata_job(job_id: int) -> Dict[str, str]:
 
 @router.get("/search")
 def search_metadata_endpoint(
-    q: str,
-    source: Optional[str] = None,
-    limit: int = 10
+    q: str, source: Optional[str] = None, limit: int = 10
 ) -> Dict[str, Any]:
     try:
         results = search_metadata(q, source, limit)
@@ -170,7 +165,7 @@ def list_metadata_sources() -> List[Dict[str, Any]]:
                 "name": s.name,
                 "base_url": s.base_url,
                 "source_type": s.source_type,
-                "description": s.description
+                "description": s.description,
             }
             for s in sources
         ]
@@ -197,21 +192,25 @@ def get_metadata_counts() -> Dict[str, Any]:
                 MetadataSource.id,
                 MetadataSource.name,
                 MetadataSource.source_type,
-                func.count(MetadataEndpoint.id).label("endpoint_count")
+                func.count(MetadataEndpoint.id).label("endpoint_count"),
             )
-            .outerjoin(MetadataEndpoint, MetadataSource.id == MetadataEndpoint.source_id)
+            .outerjoin(
+                MetadataEndpoint, MetadataSource.id == MetadataEndpoint.source_id
+            )
             .group_by(MetadataSource.id)
         )
 
         results = session.exec(stmt).all()
 
         for row in results:
-            counts.append({
-                "source_id": row.id,
-                "source_name": row.name,
-                "source_type": row.source_type,
-                "endpoint_count": row.endpoint_count or 0
-            })
+            counts.append(
+                {
+                    "source_id": row.id,
+                    "source_name": row.name,
+                    "source_type": row.source_type,
+                    "endpoint_count": row.endpoint_count or 0,
+                }
+            )
 
         return {"sources": counts}
     except Exception as e:

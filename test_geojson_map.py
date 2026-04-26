@@ -17,12 +17,19 @@ from backend.tools.result_tool import map_content_to_frontend
 test_data = {
     "type": "geojson_map",
     "features": [
-        {"type": "Feature", "geometry": {"type": "Point", "coordinates": [5.387, 52.155]}, "properties": {"name": "Amersfoort"}}
+        {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [5.387, 52.155]},
+            "properties": {"name": "Amersfoort"},
+        }
     ],
     "tile_servers": [
-        {"url": "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png", "attribution": "OSM"}
+        {
+            "url": "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            "attribution": "OSM",
+        }
     ],
-    "answer": "Here is the map you requested."
+    "answer": "Here is the map you requested.",
 }
 
 res = map_content_to_frontend(test_data)

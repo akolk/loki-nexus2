@@ -18,7 +18,9 @@ class ResearchResponse(BaseModel):
     report_path: str
 
 
-async def run_research_agent(query: str, format: str, deps: AgentDeps) -> Dict[str, Any]:
+async def run_research_agent(
+    query: str, format: str, deps: AgentDeps
+) -> Dict[str, Any]:
     """Runs the deep research agent and stores the result."""
     from backend.agents.chat import model
 
@@ -26,7 +28,7 @@ async def run_research_agent(query: str, format: str, deps: AgentDeps) -> Dict[s
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": enriched_query}
+        {"role": "user", "content": enriched_query},
     ]
 
     client = AsyncOpenAI()
@@ -46,7 +48,7 @@ async def run_research_agent(query: str, format: str, deps: AgentDeps) -> Dict[s
         query=enriched_query,
         thought_process="[Deep Research Execution]",
         output_summary=f"Report saved to {data.report_path}\nSummary: {data.summary}",
-        output_metadata={"model": model_name_str}
+        output_metadata={"model": model_name_str},
     )
 
     deps.db_session.add(step)
@@ -56,6 +58,6 @@ async def run_research_agent(query: str, format: str, deps: AgentDeps) -> Dict[s
         "response": f"Deep Research completed.\n\nSummary: {data.summary}\n\nReport saved at: {data.report_path}",
         "exec_result": {
             "type": "html",
-            "content": f"<p>Research finished! Check your workspace for <b>{data.report_path}</b></p>"
-        }
+            "content": f"<p>Research finished! Check your workspace for <b>{data.report_path}</b></p>",
+        },
     }

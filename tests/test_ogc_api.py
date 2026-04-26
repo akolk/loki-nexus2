@@ -1,6 +1,7 @@
 import pytest
 from backend.tools.ogc_api import ogc_apis
 
+
 def test_ogc_apis_loaded():
     assert ogc_apis is not None
     assert isinstance(ogc_apis, list)
