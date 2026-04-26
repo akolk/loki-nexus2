@@ -16,14 +16,16 @@ def get_session():
 
 def get_current_user(
     x_forwarded_user: str = Header("unknown_user", alias="x-forwarded-user"),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
 ) -> Tuple[User, Soul]:
     statement = select(User).where(User.username == x_forwarded_user)
     results = session.exec(statement)
     user = results.first()
 
     if not user:
-        user = User(username=x_forwarded_user, soul_data={"style": "concise", "preferences": {}})
+        user = User(
+            username=x_forwarded_user, soul_data={"style": "concise", "preferences": {}}
+        )
         session.add(user)
         session.commit()
         session.refresh(user)
@@ -32,6 +34,6 @@ def get_current_user(
         user_id=str(user.id),
         username=user.username,
         preferences=user.soul_data.get("preferences", {}),
-        style=user.soul_data.get("style", "concise")
+        style=user.soul_data.get("style", "concise"),
     )
     return user, soul

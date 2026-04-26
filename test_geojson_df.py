@@ -13,7 +13,9 @@ init_db()
 
 from backend.tools.result_tool import map_content_to_frontend
 
-df = gpd.GeoDataFrame({"name": ["Amersfoort"]}, geometry=[Point(5.387, 52.155)], crs="EPSG:4326")
+df = gpd.GeoDataFrame(
+    {"name": ["Amersfoort"]}, geometry=[Point(5.387, 52.155)], crs="EPSG:4326"
+)
 
 res = map_content_to_frontend(df)
 print("Result of map_content_to_frontend:")

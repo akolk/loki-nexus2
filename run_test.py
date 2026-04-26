@@ -1,10 +1,11 @@
 from playwright.sync_api import sync_playwright
 
+
 def test_frontend():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-        page.goto('file:///app/frontend/index.html')
+        page.goto("file:///app/frontend/index.html")
 
         # Test chat bubble opens window correctly
         page.locator("#chat-bubble").click()
@@ -25,5 +26,6 @@ def test_frontend():
         page.screenshot(path="frontend_postits.png")
 
         browser.close()
+
 
 test_frontend()

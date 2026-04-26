@@ -9,10 +9,12 @@ from sqlmodel import Session, SQLModel, create_engine
 engine = create_engine("sqlite:///:memory:")
 SQLModel.metadata.create_all(engine)
 
+
 @pytest.fixture
 def session():
     with Session(engine) as session:
         yield session
+
 
 @pytest.mark.asyncio
 async def test_scheduled_research_task(session):
@@ -23,8 +25,9 @@ async def test_scheduled_research_task(session):
     session.refresh(user)
 
     # Mock dependencies correctly using patch decorators
-    with patch("backend.scheduler.engine", engine), \
-         patch("backend.scheduler.run_agent") as mock_run_agent:
+    with patch("backend.scheduler.engine", engine), patch(
+        "backend.scheduler.run_agent"
+    ) as mock_run_agent:
 
         # Set mock return value for async agent run
         mock_run_agent.return_value = {"status": "success", "result": "mocked response"}
