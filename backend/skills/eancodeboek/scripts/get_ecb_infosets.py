@@ -14,17 +14,17 @@ def get_ecb_infoset(product, limit=100, offset=0, **kwargs):
     base_url = "https://gateway.edsn.nl/eancodeboek/v1/ecbinfoset"
 
     # 1. Basic validation
-    if product not in ['ELK', 'GAS']:
+    if product not in ["ELK", "GAS"]:
         raise ValueError("Product must be 'ELK' or 'GAS'")
 
     # 2. Define allowed parameter combinations (excluding product, limit, offset)
     allowed_combos = [
-        {'postalCode'},
-        {'postalCode', 'streetNumber'},
-        {'postalCode', 'streetNumber', 'streetNumberAddition'},
-        {'city', 'specialMeteringPoint'},
-        {'city', 'street', 'streetNumber'},
-        {'city', 'street', 'streetNumber', 'streetNumberAddition'}
+        {"postalCode"},
+        {"postalCode", "streetNumber"},
+        {"postalCode", "streetNumber", "streetNumberAddition"},
+        {"city", "specialMeteringPoint"},
+        {"city", "street", "streetNumber"},
+        {"city", "street", "streetNumber", "streetNumberAddition"},
     ]
 
     # 3. Check if current kwargs match any allowed combination
@@ -35,15 +35,15 @@ def get_ecb_infoset(product, limit=100, offset=0, **kwargs):
 
     # 4. Construct parameters for the request
     params = {
-        'product': product,
-        'limit': min(limit, 1000),  # Cap at 1000 per documentation
-        'offset': offset,
-        **kwargs
+        "product": product,
+        "limit": min(limit, 1000),  # Cap at 1000 per documentation
+        "offset": offset,
+        **kwargs,
     }
 
     try:
         # Note: You likely need an API Key/Auth header for the real gateway.edsn.nl
-        headers = {'Accept': 'application/json'}
+        headers = {"Accept": "application/json"}
         response = requests.get(base_url, params=params, headers=headers)
         response.raise_for_status()
         return response.json()

@@ -21,7 +21,7 @@ def fetch_json(url: str, timeout: float = 20.0, retries: int = 3, backoff: float
             return json.loads(raw.decode("utf-8", errors="strict"))
         except Exception as e:
             last_err = e
-            time.sleep(backoff * (2 ** i))
+            time.sleep(backoff * (2**i))
     raise RuntimeError(str(last_err))
 
 
@@ -33,7 +33,12 @@ startquarter = quarter_code(start_dt)
 endquarter = quarter_code(end_dt)
 
 base = "https://vastgoeddashboard.kadaster.nl/woningwaardecalculatorproxy/api/v1/propertyvalue/calculate"
-params = {"province": province.upper(), "startquarter": int(startquarter), "endquarter": int(endquarter), "startprice": int(purchase_price)}
+params = {
+    "province": province.upper(),
+    "startquarter": int(startquarter),
+    "endquarter": int(endquarter),
+    "startprice": int(purchase_price),
+}
 url = base + "?" + urlencode(params)
 
 data = fetch_json(url)
@@ -53,7 +58,9 @@ if isinstance(data, dict):
         ]
         if price_change:
             parts.append(f"Waardestijging (provinciale prijsindex): {price_change}")
-        parts.append(f"Provincie: {province.upper()} | startquarter={startquarter} | endquarter={endquarter}")
+        parts.append(
+            f"Provincie: {province.upper()} | startquarter={startquarter} | endquarter={endquarter}"
+        )
         if message:
             parts.append(f"Opmerking: {message}")
         result = "\n".join(parts)
