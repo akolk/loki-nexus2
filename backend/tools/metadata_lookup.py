@@ -19,10 +19,8 @@ def _get_cache_key(*args) -> str:
 
 
 def find_endpoint(
-        query: str,
-        source_type: str = "pdok",
-        top_k: int = 1,
-        filter_geojson: bool = False) -> str:
+    query: str, source_type: str = "pdok", top_k: int = 1, filter_geojson: bool = False
+) -> str:
     """
     Find the best matching endpoint using vector similarity search.
 
@@ -44,20 +42,15 @@ def find_endpoint(
         asyncio.set_event_loop(loop)
 
     result = loop.run_until_complete(
-        find_endpoint_async(
-            query,
-            source_type,
-            top_k,
-            filter_geojson))
+        find_endpoint_async(query, source_type, top_k, filter_geojson)
+    )
     logger.info(result)
     return result
 
 
 async def find_endpoint_async(
-        query: str,
-        source_type: str = "pdok",
-        top_k: int = 1,
-        filter_geojson: bool = False) -> str:
+    query: str, source_type: str = "pdok", top_k: int = 1, filter_geojson: bool = False
+) -> str:
     """
     Async version of find_endpoint with caching.
     """
@@ -75,17 +68,20 @@ async def find_endpoint_async(
     session = get_metadata_session()
 
     try:
-        source = session.exec(select(MetadataSource).where(
-            MetadataSource.source_type == source_type)).first()
+        source = session.exec(
+            select(MetadataSource).where(MetadataSource.source_type == source_type)
+        ).first()
 
         if not source:
-            result = json.dumps({
-                "error": f"No metadata source found for {source_type}",
-                "url": None,
-                "title": None,
-                "description": None,
-                "api_type": None
-            })
+            result = json.dumps(
+                {
+                    "error": f"No metadata source found for {source_type}",
+                    "url": None,
+                    "title": None,
+                    "description": None,
+                    "api_type": None,
+                }
+            )
             _metadata_cache[cache_key] = (result, current_time)
             return result
 
@@ -122,22 +118,23 @@ async def find_endpoint_async(
                 LIMIT :top_k
             """)
 
-        result = session.execute(sql, {
-            "embedding_str": embedding_str,
-            "source_id": source.id,
-            "top_k": top_k
-        })
+        result = session.execute(
+            sql,
+            {"embedding_str": embedding_str, "source_id": source.id, "top_k": top_k},
+        )
 
         rows = result.fetchall()
 
         if not rows:
-            return json.dumps({
-                "error": f"No endpoints found for {source_type}",
-                "url": None,
-                "title": None,
-                "description": None,
-                "api_type": None
-            })
+            return json.dumps(
+                {
+                    "error": f"No endpoints found for {source_type}",
+                    "url": None,
+                    "title": None,
+                    "description": None,
+                    "api_type": None,
+                }
+            )
 
         results = []
         for row in rows:
@@ -152,18 +149,20 @@ async def find_endpoint_async(
 
             preferred_url = tiles_url or collections_url or row.endpoint_url
 
-            results.append({
-                "url": row.endpoint_url,
-                "title": row.title,
-                "description": row.description,
-                "api_type": row.api_type,
-                "source": source_type,
-                "extra_metadata": extra_metadata,
-                "tiles_url": tiles_url,
-                "collections_url": collections_url,
-                "preferred_url": preferred_url,
-                "distance": row.distance
-            })
+            results.append(
+                {
+                    "url": row.endpoint_url,
+                    "title": row.title,
+                    "description": row.description,
+                    "api_type": row.api_type,
+                    "source": source_type,
+                    "extra_metadata": extra_metadata,
+                    "tiles_url": tiles_url,
+                    "collections_url": collections_url,
+                    "preferred_url": preferred_url,
+                    "distance": row.distance,
+                }
+            )
 
         if top_k == 1:
             result = json.dumps(results[0])
@@ -175,22 +174,23 @@ async def find_endpoint_async(
 
     except Exception as e:
         logger.error(f"Error finding endpoint: {e}")
-        return json.dumps({
-            "error": str(e),
-            "url": None,
-            "title": None,
-            "description": None,
-            "api_type": None,
-            "results": [] if top_k > 1 else None
-        })
+        return json.dumps(
+            {
+                "error": str(e),
+                "url": None,
+                "title": None,
+                "description": None,
+                "api_type": None,
+                "results": [] if top_k > 1 else None,
+            }
+        )
     finally:
         session.close()
 
 
 def search_metadata(
-        query: str,
-        source_type: Optional[str] = None,
-        limit: int = 10) -> List[dict]:
+    query: str, source_type: Optional[str] = None, limit: int = 10
+) -> List[dict]:
     """
     Search metadata endpoints (synchronous version for API endpoints).
     """
@@ -202,15 +202,12 @@ def search_metadata(
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-    return loop.run_until_complete(
-        search_metadata_async(
-            query, source_type, limit))
+    return loop.run_until_complete(search_metadata_async(query, source_type, limit))
 
 
 async def search_metadata_async(
-        query: str,
-        source_type: Optional[str] = None,
-        limit: int = 10) -> List[dict]:
+    query: str, source_type: Optional[str] = None, limit: int = 10
+) -> List[dict]:
     """
     Search metadata endpoints.
     """
@@ -234,10 +231,14 @@ async def search_metadata_async(
                 ORDER BY e.embedding <=> cast(:embedding_str as vector)
                 LIMIT :limit
             """)
-            result = session.execute(sql,
-                                     {"embedding_str": embedding_str,
-                                      "source_type": source_type,
-                                      "limit": limit})
+            result = session.execute(
+                sql,
+                {
+                    "embedding_str": embedding_str,
+                    "source_type": source_type,
+                    "limit": limit,
+                },
+            )
         else:
             sql = text("""
                 SELECT e.id, e.endpoint_url, e.title, e.description, e.api_type,
@@ -249,22 +250,25 @@ async def search_metadata_async(
                 LIMIT :limit
             """)
             result = session.execute(
-                sql, {"embedding_str": embedding_str, "limit": limit})
+                sql, {"embedding_str": embedding_str, "limit": limit}
+            )
 
         rows = result.fetchall()
 
         results = []
         for row in rows:
-            results.append({
-                "id": row.id,
-                "url": row.endpoint_url,
-                "title": row.title,
-                "description": row.description,
-                "api_type": row.api_type,
-                "source_name": row.source_name,
-                "source_type": row.source_type,
-                "distance": row.distance
-            })
+            results.append(
+                {
+                    "id": row.id,
+                    "url": row.endpoint_url,
+                    "title": row.title,
+                    "description": row.description,
+                    "api_type": row.api_type,
+                    "source_name": row.source_name,
+                    "source_type": row.source_type,
+                    "distance": row.distance,
+                }
+            )
 
         return results
 
