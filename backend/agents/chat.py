@@ -36,8 +36,6 @@ else:
     model = None
 
 model_settings = OpenAIResponsesModelSettings(
-    openai_reasoning_effort=os.environ.get("OPENAI_REASONING_EFFORT", "low"),
-    openai_reasoning_summary=os.environ.get("OPENAI_REASONING_SUMMARY", "auto"),
     max_tokens=int(os.environ.get("OPENAI_MAX_TOKENS", "50000")),
     model_config={
         "max_retries": int(os.environ.get("OPENAI_MAX_RETRIES", "3"))
@@ -66,7 +64,7 @@ def sys_prompt(soul, memory) -> str:
         ### Context
         - If needed, you may access the internet for OGC APIs or CBS APIs returned by the tools.
         - Calculations must be performed in EPSG:28992 (RD New) and visualizations must be returned in WGS84 (EPSG:4326).
-        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, dataframes, sklearn, xgb. DO NOT USE matplotlib, folium, mapbox, or other external libraries.
+        - You may use ONLY the Python Standard Library and provided global variables: np, pd, px, go, gpd, sklearn, xgb. DO NOT USE matplotlib, folium, mapbox, or other external libraries.
 
         ### Directives for the `code` field
         1. Stateless Execution: Each request is isolated. Write a complete, self-contained final Python script without comments.
@@ -255,16 +253,6 @@ def build_system_prompt(ctx: AgentDeps, toolsets: List = None) -> str:
     return f"{userinfo}\n\n" + sys_prompt(userinfo, memory_str)
 
 
-async def build_system_prompt_async(ctx: AgentDeps, toolsets: List = None) -> str:
-    """Build the complete system prompt including skills (async version)."""
-    soul = ctx.user_soul
-    memory = soul.preferences.get("memory", "") if soul.preferences else ""
-    memory_str = f"\nMemory about user: {memory}" if memory else ""
-    userinfo = f"User Preferences: {soul.preferences}. Communication Style: {soul.style}.{memory_str}"
-
-    return f"{userinfo}\n\n" + sys_prompt(userinfo, memory_str)
-
-
 def get_result(exec_globals: Dict[str, Any], allowed_globals: set) -> Any:
     result = exec_globals.get("result")
 
@@ -300,7 +288,7 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
     ]
 
     try:
-        system_prompt = await build_system_prompt_async(deps, toolsets)
+        system_prompt = build_system_prompt(deps, toolsets)
         result = await agent.run(query, deps=deps, message_history=message_history, toolsets=toolsets, instructions=system_prompt)
         agent_response = result.output
 
@@ -338,7 +326,7 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
         logger.error(f"Error executing agent in run_agent: {e}", exc_info=True)
         raise e
 
-    exec_globals = {"np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl}
+    exec_globals = {"np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl, "sklearn": skl}
     allowed_globals = set(exec_globals.keys())
 
     exec_result: Optional[Dict[str, Any]] = None
@@ -392,8 +380,8 @@ async def run_agent(query: str, deps: AgentDeps) -> Dict[str, Any]:
                 error_prompt = f"{query}\n\nHerstel fout: {exec_error}\n\nProbeer de code te corrigeren."
 
                 try:
-                    exec_globals = {"np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl}
-                    system_prompt = await build_system_prompt_async(deps, toolsets)
+                    exec_globals = {"np": np, "pd": pd, "px": px, "go": go, "gpd": gpd, "xgb": xgb, "skl": skl, "sklearn": skl}
+                    system_prompt = build_system_prompt(deps, toolsets)
 
                     result = await agent.run(
                         error_prompt,
