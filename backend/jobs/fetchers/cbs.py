@@ -42,7 +42,7 @@ def get_or_create_cbs_source(session) -> MetadataSource:
             name="CBS",
             base_url="https://opendata.cbs.nl",
             source_type="cbs",
-            description="Centraal Bureau voor de Statistiek - Dutch statistics API"
+            description="Centraal Bureau voor de Statistiek - Dutch statistics API",
         )
         session.add(source)
         session.commit()
@@ -77,6 +77,11 @@ async def fetch_cbs_metadata() -> str:
         total_datasets = len(value)
         logger.info(f"Found {total_datasets} CBS datasets to process")
 
+        existing_endpoints_list = session.exec(
+            select(MetadataEndpoint).where(MetadataEndpoint.source_id == source.id)
+        ).all()
+        existing_endpoints = {ep.endpoint_url: ep for ep in existing_endpoints_list}
+
         for dataset in value:
             try:
                 identifier = dataset.get("Identifier", "")
@@ -87,12 +92,7 @@ async def fetch_cbs_metadata() -> str:
 
                 odata_url = f"https://opendata.cbs.nl/ODataApi/odata/{identifier}"
 
-                existing = session.exec(
-                    select(MetadataEndpoint).where(
-                        MetadataEndpoint.source_id == source.id,
-                        MetadataEndpoint.endpoint_url == odata_url
-                    )
-                ).first()
+                existing = existing_endpoints.get(odata_url)
 
                 embedding_text = f"{title}: {description}"
                 if keywords:
@@ -106,7 +106,7 @@ async def fetch_cbs_metadata() -> str:
                     "frequency": frequency,
                     "identifier": identifier,
                     "keywords": keywords,
-                    "endpoint_metadata": endpoint_metadata
+                    "endpoint_metadata": endpoint_metadata,
                 }
 
                 if existing:
@@ -123,10 +123,11 @@ async def fetch_cbs_metadata() -> str:
                         title=title,
                         description=description,
                         api_type="CBS OData",
-                        embedding=embedding
+                        embedding=embedding,
                     )
                     endpoint.set_extra_metadata(extra_data)
                     session.add(endpoint)
+                    existing_endpoints[odata_url] = endpoint
                     endpoints_added += 1
 
                 processed = endpoints_added + endpoints_updated

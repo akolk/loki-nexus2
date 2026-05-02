@@ -7,9 +7,11 @@ from pydantic_ai import Agent
 # Mock database
 engine = create_engine("sqlite:///:memory:")
 
+
 def get_session():
     with Session(engine) as session:
         yield session
+
 
 async def verify_agent():
     print("Verifying Agent...")
@@ -29,11 +31,13 @@ async def verify_agent():
 
         # Verify the tool registration
         from backend.tools.data_tool import run_data_query
+
         # This is a bit circular, but ensures the tool is importable and runnable
         res = run_data_query("SELECT 1")
         print("Tools importable.")
 
     print("Agent structure verification passed.")
+
 
 if __name__ == "__main__":
     asyncio.run(verify_agent())

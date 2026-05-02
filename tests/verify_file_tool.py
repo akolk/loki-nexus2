@@ -1,6 +1,7 @@
 from backend.tools.file_tool import read_file, write_file
 import os
 
+
 def test_file_tool_sandbox():
     print("Verifying FileTool Sandbox...")
 
@@ -23,9 +24,12 @@ def test_file_tool_sandbox():
     # Test 5: Absolute path outside workspace
     # Note: resolving absolute paths might depend on OS, but we check if it is within WORKSPACE_DIR
     res = read_file("/etc/passwd")
-    assert "Access denied" in res or "Error" in res, f"Expected denial/error, got: {res}"
+    assert (
+        "Access denied" in res or "Error" in res
+    ), f"Expected denial/error, got: {res}"
 
     print("FileTool Sandbox verified.")
+
 
 if __name__ == "__main__":
     test_file_tool_sandbox()
