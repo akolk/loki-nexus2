@@ -3,7 +3,7 @@ import requests
 from typing import List, Dict, Any, Optional
 from backend.database_metadata import get_metadata_session
 from backend.models_metadata import MetadataSource, MetadataEndpoint
-from backend.jobs.embeddings import generate_embedding
+from backend.jobs.embeddings import generate_embeddings_batch
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ def get_or_create_cbs_source(session) -> MetadataSource:
             name="CBS",
             base_url="https://opendata.cbs.nl",
             source_type="cbs",
-            description="Centraal Bureau voor de Statistiek - Dutch statistics API"
+            description="Centraal Bureau voor de Statistiek - Dutch statistics API",
         )
         session.add(source)
         session.commit()
@@ -77,28 +77,62 @@ async def fetch_cbs_metadata() -> str:
         total_datasets = len(value)
         logger.info(f"Found {total_datasets} CBS datasets to process")
 
+        # Pre-fetch existing endpoints into a dictionary for O(1) lookups
+        existing_endpoints_list = session.exec(
+            select(MetadataEndpoint).where(MetadataEndpoint.source_id == source.id)
+        ).all()
+        existing_endpoints = {ep.endpoint_url: ep for ep in existing_endpoints_list}
+
+        # First pass: collect all necessary text for embeddings
+        datasets_to_process = []
+        embedding_texts = []
+
         for dataset in value:
+            identifier = dataset.get("Identifier", "")
+            title = dataset.get("Title", "")
+            description = dataset.get("Description", "")
+            frequency = dataset.get("Frequency", "")
+            keywords = dataset.get("Keywords", "")
+
+            odata_url = f"https://opendata.cbs.nl/ODataApi/odata/{identifier}"
+
+            embedding_text = f"{title}: {description}"
+            if keywords:
+                embedding_text += f" Keywords: {keywords}"
+
+            embedding_texts.append(embedding_text)
+            datasets_to_process.append({
+                "identifier": identifier,
+                "title": title,
+                "description": description,
+                "frequency": frequency,
+                "keywords": keywords,
+                "odata_url": odata_url,
+            })
+
+        # Process embeddings in batches to optimize network calls
+        batch_size = 100
+        all_embeddings = []
+        for i in range(0, len(embedding_texts), batch_size):
+            batch_texts = embedding_texts[i:i + batch_size]
             try:
-                identifier = dataset.get("Identifier", "")
-                title = dataset.get("Title", "")
-                description = dataset.get("Description", "")
-                frequency = dataset.get("Frequency", "")
-                keywords = dataset.get("Keywords", "")
+                batch_embeddings = await generate_embeddings_batch(batch_texts)
+                all_embeddings.extend(batch_embeddings)
+            except Exception as e:
+                logger.error(f"Error generating embeddings for batch {i}: {e}")
+                # Provide fallback empty embeddings to keep indexing synced
+                all_embeddings.extend([None for _ in batch_texts])
 
-                odata_url = f"https://opendata.cbs.nl/ODataApi/odata/{identifier}"
-
-                existing = session.exec(
-                    select(MetadataEndpoint).where(
-                        MetadataEndpoint.source_id == source.id,
-                        MetadataEndpoint.endpoint_url == odata_url
-                    )
-                ).first()
-
-                embedding_text = f"{title}: {description}"
-                if keywords:
-                    embedding_text += f" Keywords: {keywords}"
-
-                embedding = await generate_embedding(embedding_text)
+        # Second pass: Update or Create endpoints using the pre-fetched dict and batched embeddings
+        for idx, dataset_info in enumerate(datasets_to_process):
+            try:
+                identifier = dataset_info["identifier"]
+                title = dataset_info["title"]
+                description = dataset_info["description"]
+                frequency = dataset_info["frequency"]
+                keywords = dataset_info["keywords"]
+                odata_url = dataset_info["odata_url"]
+                embedding = all_embeddings[idx] if idx < len(all_embeddings) else None
 
                 endpoint_metadata = fetch_endpoint_metadata(identifier)
 
@@ -106,13 +140,16 @@ async def fetch_cbs_metadata() -> str:
                     "frequency": frequency,
                     "identifier": identifier,
                     "keywords": keywords,
-                    "endpoint_metadata": endpoint_metadata
+                    "endpoint_metadata": endpoint_metadata,
                 }
+
+                existing = existing_endpoints.get(odata_url)
 
                 if existing:
                     existing.title = title
                     existing.description = description
-                    existing.embedding = embedding
+                    if embedding:
+                        existing.embedding = embedding
                     existing.api_type = "CBS OData"
                     existing.set_extra_metadata(extra_data)
                     endpoints_updated += 1
@@ -123,10 +160,11 @@ async def fetch_cbs_metadata() -> str:
                         title=title,
                         description=description,
                         api_type="CBS OData",
-                        embedding=embedding
+                        embedding=embedding,
                     )
                     endpoint.set_extra_metadata(extra_data)
                     session.add(endpoint)
+                    existing_endpoints[odata_url] = endpoint  # Keep dict synced
                     endpoints_added += 1
 
                 processed = endpoints_added + endpoints_updated
