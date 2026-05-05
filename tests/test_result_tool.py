@@ -85,3 +85,19 @@ def test_map_content_to_frontend_geodataframe_drop_id():
     features = result["content"]["features"]
     assert len(features) == 1
     assert "id" not in features[0]
+
+def test_map_content_to_frontend_geodataframe_datetime():
+    df = pd.DataFrame(
+        {'City': ['Amersfoort'],
+         'date': [pd.Timestamp('2023-01-01')],
+         'lon': [5.3872],
+         'lat': [52.1551]}
+    )
+    gdf = gpd.GeoDataFrame(
+        df, geometry=gpd.points_from_xy(df.lon, df.lat), crs="EPSG:4326"
+    )
+
+    result = map_content_to_frontend(gdf)
+    assert result["type"] == "geojson_map"
+    features = result["content"]["features"]
+    assert features[0]["properties"]["date"] == "2023-01-01"

@@ -5,7 +5,7 @@ from backend.models import Soul
 from sqlmodel import Session, create_engine, SQLModel
 import asyncio
 
-engine = create_engine("sqlite:///:memory:")
+engine = create_engine('sqlite:///:memory:', connect_args={'check_same_thread': False})
 SQLModel.metadata.create_all(engine)
 
 @pytest.fixture
