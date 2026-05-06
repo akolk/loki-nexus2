@@ -3,7 +3,7 @@ import requests
 from typing import List, Dict, Any, Optional
 from backend.database_metadata import get_metadata_session
 from backend.models_metadata import MetadataSource, MetadataEndpoint
-from backend.jobs.embeddings import generate_embedding
+from backend.jobs.embeddings import generate_embeddings_batch
 
 logger = logging.getLogger(__name__)
 
@@ -125,8 +125,17 @@ async def fetch_pdok_metadata() -> str:
 
         collections = data.get("apis", [])
 
+        # N+1 Optimization: Pre-fetch existing endpoints
+        existing_endpoints_query = session.exec(
+            select(MetadataEndpoint).where(MetadataEndpoint.source_id == source.id)
+        ).all()
+        existing_endpoints_dict = {ep.endpoint_url: ep for ep in existing_endpoints_query}
+
+        # First pass: collect data and batch embeddings
+        api_items = []
+        texts_to_embed = []
+
         for api in collections:
-            title = ""
             try:
                 title = api.get("title", "")
                 description = api.get("description", "")
@@ -141,18 +150,6 @@ async def fetch_pdok_metadata() -> str:
                 if not api_url:
                     continue
 
-                logger.info(f"Processing PDOK API: {title}")
-
-                api_info = fetch_ogc_api_info(api_url)
-                collections_url = api_info.get("collections_url")
-
-                existing = session.exec(
-                    select(MetadataEndpoint).where(
-                        MetadataEndpoint.source_id == source.id,
-                        MetadataEndpoint.endpoint_url == api_url
-                    )
-                ).first()
-
                 keywords = api.get("keywords", [])
                 processed_keywords = []
                 for kw in keywords:
@@ -166,7 +163,46 @@ async def fetch_pdok_metadata() -> str:
                 if keywords_str:
                     embedding_text += f" Keywords: {keywords_str}"
 
-                embedding = await generate_embedding(embedding_text)
+                texts_to_embed.append(embedding_text)
+                api_items.append({
+                    "title": title,
+                    "description": description,
+                    "api_url": api_url,
+                    "processed_keywords": processed_keywords,
+                    "embedding_text": embedding_text
+                })
+            except Exception as e:
+                logger.warning(f"Error preparing API {api.get('title', 'unknown')}: {e}")
+                continue
+
+        # Generate embeddings in batches of 100
+        batch_size = 100
+        all_embeddings = []
+        for i in range(0, len(texts_to_embed), batch_size):
+            batch = texts_to_embed[i:i + batch_size]
+            try:
+                batch_embeddings = await generate_embeddings_batch(batch)
+                all_embeddings.extend(batch_embeddings)
+            except Exception as e:
+                logger.warning(f"Failed to generate embeddings for batch {i//batch_size}: {e}")
+                all_embeddings.extend([None] * len(batch))
+
+        # Second pass: Process APIs and fetch collections
+        for i, item in enumerate(api_items):
+            try:
+                title = item["title"]
+                description = item["description"]
+                api_url = item["api_url"]
+                processed_keywords = item["processed_keywords"]
+
+                embedding = all_embeddings[i] if i < len(all_embeddings) else None
+
+                logger.info(f"Processing PDOK API: {title}")
+
+                api_info = fetch_ogc_api_info(api_url)
+                collections_url = api_info.get("collections_url")
+
+                existing = existing_endpoints_dict.get(api_url)
 
                 extra_data = {
                     "tiles_url": api_info.get("tiles_url"),
@@ -178,7 +214,8 @@ async def fetch_pdok_metadata() -> str:
                 if existing:
                     existing.title = title
                     existing.description = description
-                    existing.embedding = embedding
+                    if embedding is not None:
+                        existing.embedding = embedding
                     existing.api_type = "OGC API"
                     existing.set_extra_metadata(extra_data)
                     endpoints_updated += 1
@@ -193,13 +230,18 @@ async def fetch_pdok_metadata() -> str:
                     )
                     endpoint.set_extra_metadata(extra_data)
                     session.add(endpoint)
+                    existing_endpoints_dict[api_url] = endpoint
                     endpoints_added += 1
 
                 session.commit()
 
+                # Process collections for this API
                 if collections_url:
                     collections_data = fetch_collections_metadata(collections_url)
                     logger.info(f"Found {len(collections_data)} collections for {title}")
+
+                    coll_items = []
+                    coll_texts_to_embed = []
 
                     for coll in collections_data:
                         coll_url = coll.get("features_url", "")
@@ -209,21 +251,44 @@ async def fetch_pdok_metadata() -> str:
                         coll_id = coll.get("id", "")
                         coll_title = coll.get("title", "")
                         coll_desc = coll.get("description", "")
-
-                        coll_existing = session.exec(
-                            select(MetadataEndpoint).where(
-                                MetadataEndpoint.source_id == source.id,
-                                MetadataEndpoint.endpoint_url == coll_url
-                            )
-                        ).first()
-
                         coll_keywords = coll.get("keywords", [])
+
                         coll_keywords_str = ", ".join(coll_keywords) if coll_keywords else ""
                         coll_embedding_text = f"{coll_title}: {coll_desc}"
                         if coll_keywords_str:
                             coll_embedding_text += f" Keywords: {coll_keywords_str}"
 
-                        coll_embedding = await generate_embedding(coll_embedding_text)
+                        coll_texts_to_embed.append(coll_embedding_text)
+                        coll_items.append({
+                            "coll_url": coll_url,
+                            "coll_id": coll_id,
+                            "coll_title": coll_title,
+                            "coll_desc": coll_desc,
+                            "coll_keywords": coll_keywords,
+                            "coll_embedding_text": coll_embedding_text
+                        })
+
+                    # Batch embeddings for collections
+                    coll_all_embeddings = []
+                    for j in range(0, len(coll_texts_to_embed), batch_size):
+                        batch = coll_texts_to_embed[j:j + batch_size]
+                        try:
+                            batch_embeddings = await generate_embeddings_batch(batch)
+                            coll_all_embeddings.extend(batch_embeddings)
+                        except Exception as e:
+                            logger.warning(f"Failed to generate coll embeddings for batch {j//batch_size}: {e}")
+                            coll_all_embeddings.extend([None] * len(batch))
+
+                    for k, c_item in enumerate(coll_items):
+                        coll_url = c_item["coll_url"]
+                        coll_id = c_item["coll_id"]
+                        coll_title = c_item["coll_title"]
+                        coll_desc = c_item["coll_desc"]
+                        coll_keywords = c_item["coll_keywords"]
+
+                        coll_embedding = coll_all_embeddings[k] if k < len(coll_all_embeddings) else None
+
+                        coll_existing = existing_endpoints_dict.get(coll_url)
 
                         parent_title = title.replace(" (OGC API)", "").replace("OGC API", "").strip()
                         full_title = f"{parent_title} - {coll_title}"
@@ -238,7 +303,8 @@ async def fetch_pdok_metadata() -> str:
                         if coll_existing:
                             coll_existing.title = full_title
                             coll_existing.description = coll_desc
-                            coll_existing.embedding = coll_embedding
+                            if coll_embedding is not None:
+                                coll_existing.embedding = coll_embedding
                             coll_existing.api_type = "OGC API Collection"
                             coll_existing.set_extra_metadata(coll_extra)
                         else:
@@ -252,10 +318,13 @@ async def fetch_pdok_metadata() -> str:
                             )
                             coll_endpoint.set_extra_metadata(coll_extra)
                             session.add(coll_endpoint)
+                            existing_endpoints_dict[coll_url] = coll_endpoint
 
             except Exception as e:
-                logger.warning(f"Error processing API {title}: {e}")
+                logger.warning(f"Error processing API {item['title']}: {e}")
                 continue
+
+        session.commit()
 
         session.commit()
 
