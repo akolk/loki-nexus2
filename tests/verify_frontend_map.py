@@ -6,14 +6,16 @@ import threading
 import time
 from playwright.sync_api import sync_playwright
 
+
 def run_app():
     uvicorn.run(app, host="127.0.0.1", port=8000, log_level="critical")
+
 
 def verify_frontend():
     # Start server in thread
     t = threading.Thread(target=run_app, daemon=True)
     t.start()
-    time.sleep(3) # Wait for server startup
+    time.sleep(3)  # Wait for server startup
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -78,6 +80,7 @@ def verify_frontend():
             raise e
         finally:
             browser.close()
+
 
 if __name__ == "__main__":
     verify_frontend()

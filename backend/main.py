@@ -11,7 +11,7 @@ from backend.scheduler import (
     create_metadata_job,
     delete_metadata_job,
     run_metadata_job,
-    scheduler
+    scheduler,
 )
 from backend.database_metadata import create_metadata_tables
 from backend.api import chat_router, jobs_router, metadata_router, user_router
@@ -20,8 +20,7 @@ log_level_str = os.environ.get("LOG_LEVEL", "INFO").upper()
 log_level = getattr(logging, log_level_str, logging.INFO)
 
 logging.basicConfig(
-    level=log_level,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=log_level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -45,7 +44,7 @@ def create_default_metadata_jobs():
                 schedule_type="INTERVAL",
                 config={"source": "pdok"},
                 interval_seconds=86400,
-                enabled=True
+                enabled=True,
             )
             logger.info("Created default PDOK Metadata Sync job")
 
@@ -56,7 +55,7 @@ def create_default_metadata_jobs():
                 schedule_type="INTERVAL",
                 config={"source": "cbs"},
                 interval_seconds=86400,
-                enabled=True
+                enabled=True,
             )
             logger.info("Created default CBS Metadata Sync job")
 
@@ -73,6 +72,7 @@ async def lifespan(app: FastAPI):
 
     try:
         from backend.skills_manager import init_skills_manager
+
         skills_refresh = int(os.environ.get("SKILLS_REFRESH_INTERVAL", "300"))
         init_skills_manager(refresh_interval=skills_refresh)
     except Exception as e:

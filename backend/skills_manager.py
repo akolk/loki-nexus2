@@ -2,7 +2,12 @@ import logging
 import os
 from typing import Optional
 
-from pydantic_ai_skills import SkillsToolset, LocalSkillScriptExecutor, discover_skills, GitSkillsRegistry
+from pydantic_ai_skills import (
+    SkillsToolset,
+    LocalSkillScriptExecutor,
+    discover_skills,
+    GitSkillsRegistry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +15,9 @@ logger = logging.getLogger(__name__)
 class SkillsManager:
     """Manages skills loading from local directory or Git registry."""
 
-    def __init__(self, skills_dir: str = "/app/backend/skills", refresh_interval: int = 300):
+    def __init__(
+        self, skills_dir: str = "/app/backend/skills", refresh_interval: int = 300
+    ):
         self.skills_dir = skills_dir
         self.refresh_interval = refresh_interval
         self._toolset: Optional[SkillsToolset] = None
@@ -29,12 +36,18 @@ class SkillsManager:
             logger.info(f"Skills directory found: {self.skills_dir}")
             self._load_from_directory()
         else:
-            logger.info("No skills registry configured and local skills directory not found, skipping skills")
+            logger.info(
+                "No skills registry configured and local skills directory not found, skipping skills"
+            )
 
     def _load_from_registry(self, registry_url: str) -> None:
         """Load skills from a Git registry."""
         try:
-            if registry_url.startswith("http://") or registry_url.startswith("https://") or registry_url.startswith("git@"):
+            if (
+                registry_url.startswith("http://")
+                or registry_url.startswith("https://")
+                or registry_url.startswith("git@")
+            ):
                 git_registry = GitSkillsRegistry(repo_url=registry_url)
                 skills = git_registry.get_skills()
             else:
@@ -42,7 +55,7 @@ class SkillsManager:
                     path=registry_url,
                     validate=True,
                     max_depth=3,
-                    script_executor=LocalSkillScriptExecutor()
+                    script_executor=LocalSkillScriptExecutor(),
                 )
 
             if skills:
@@ -60,7 +73,7 @@ class SkillsManager:
             path=self.skills_dir,
             validate=True,
             max_depth=3,
-            script_executor=LocalSkillScriptExecutor()
+            script_executor=LocalSkillScriptExecutor(),
         )
 
         if skills:
@@ -83,12 +96,16 @@ class SkillsManager:
 _skills_manager: Optional[SkillsManager] = None
 
 
-def init_skills_manager(skills_dir: Optional[str] = None, refresh_interval: int = 300) -> SkillsManager:
+def init_skills_manager(
+    skills_dir: Optional[str] = None, refresh_interval: int = 300
+) -> SkillsManager:
     """Initialize the global skills manager."""
     global _skills_manager
     if skills_dir is None:
         skills_dir = os.environ.get("SKILLS_DIR", "/app/backend/skills")
-    _skills_manager = SkillsManager(skills_dir=skills_dir, refresh_interval=refresh_interval)
+    _skills_manager = SkillsManager(
+        skills_dir=skills_dir, refresh_interval=refresh_interval
+    )
     return _skills_manager
 
 
