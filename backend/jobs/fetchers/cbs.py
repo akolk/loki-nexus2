@@ -42,7 +42,7 @@ def get_or_create_cbs_source(session) -> MetadataSource:
             name="CBS",
             base_url="https://opendata.cbs.nl",
             source_type="cbs",
-            description="Centraal Bureau voor de Statistiek - Dutch statistics API"
+            description="Centraal Bureau voor de Statistiek - Dutch statistics API",
         )
         session.add(source)
         session.commit()
@@ -90,7 +90,7 @@ async def fetch_cbs_metadata() -> str:
                 existing = session.exec(
                     select(MetadataEndpoint).where(
                         MetadataEndpoint.source_id == source.id,
-                        MetadataEndpoint.endpoint_url == odata_url
+                        MetadataEndpoint.endpoint_url == odata_url,
                     )
                 ).first()
 
@@ -106,7 +106,7 @@ async def fetch_cbs_metadata() -> str:
                     "frequency": frequency,
                     "identifier": identifier,
                     "keywords": keywords,
-                    "endpoint_metadata": endpoint_metadata
+                    "endpoint_metadata": endpoint_metadata,
                 }
 
                 if existing:
@@ -123,7 +123,7 @@ async def fetch_cbs_metadata() -> str:
                         title=title,
                         description=description,
                         api_type="CBS OData",
-                        embedding=embedding
+                        embedding=embedding,
                     )
                     endpoint.set_extra_metadata(extra_data)
                     session.add(endpoint)

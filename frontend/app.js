@@ -1011,7 +1011,8 @@ async function sendMessage() {
 }
 
 function handleKey(e) {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
         sendMessage();
     }
 }

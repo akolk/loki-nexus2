@@ -3,12 +3,13 @@ import os
 from unittest.mock import MagicMock
 
 # Mock duckdb, pandas, pyproj before importing DataTool
-sys.modules['duckdb'] = MagicMock()
-sys.modules['pandas'] = MagicMock()
-sys.modules['pyproj'] = MagicMock()
+sys.modules["duckdb"] = MagicMock()
+sys.modules["pandas"] = MagicMock()
+sys.modules["pyproj"] = MagicMock()
 
 import backend.tools.data_tool as data_tool
 from backend.tools.data_tool import DataTool
+
 
 def test_username_sanitization():
     print("Testing username sanitization...")
@@ -25,7 +26,7 @@ def test_username_sanitization():
         "'; DROP TABLE users; --",
         "user/../../etc/passwd",
         "admin$(whoami)",
-        "user space"
+        "user space",
     ]
     for u in malicious_usernames:
         try:
@@ -34,6 +35,7 @@ def test_username_sanitization():
             sys.exit(1)
         except ValueError as e:
             print(f"  [PASS] Correctly rejected malicious username: {u} - {e}")
+
 
 def test_limit_enforcement():
     print("\nTesting limit enforcement...")
@@ -47,8 +49,8 @@ def test_limit_enforcement():
     test_cases = [
         (50, "LIMIT 50"),
         ("10", "LIMIT 10"),
-        ("invalid; DROP TABLE users; --", "LIMIT 100"), # should fall back to 100
-        (None, "LIMIT 100")
+        ("invalid; DROP TABLE users; --", "LIMIT 100"),  # should fall back to 100
+        (None, "LIMIT 100"),
     ]
 
     for input_limit, expected_fragment in test_cases:
@@ -67,10 +69,15 @@ def test_limit_enforcement():
         # Get the actual query executed
         executed_query = mock_sql.call_args[0][0]
         if expected_fragment in executed_query:
-            print(f"  [PASS] Input limit '{input_limit}' -> Found '{expected_fragment}' in query")
+            print(
+                f"  [PASS] Input limit '{input_limit}' -> Found '{expected_fragment}' in query"
+            )
         else:
-            print(f"  [FAIL] Input limit '{input_limit}' -> Query: {executed_query} (expected {expected_fragment})")
+            print(
+                f"  [FAIL] Input limit '{input_limit}' -> Query: {executed_query} (expected {expected_fragment})"
+            )
             sys.exit(1)
+
 
 if __name__ == "__main__":
     test_username_sanitization()

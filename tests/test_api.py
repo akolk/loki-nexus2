@@ -11,11 +11,15 @@ from unittest.mock import patch, MagicMock
 # Override dependency or env if needed, but TestClient works well with app
 client = TestClient(app)
 
+
 # Patch the run_agent function to avoid real agent execution/API calls
 @patch("backend.api.chat.run_agent")
 def test_chat_flow(mock_run_agent):
     # Setup mock
-    mock_run_agent.return_value = {"response": {"answer": "Mocked Agent Response"}, "exec_result": None}
+    mock_run_agent.return_value = {
+        "response": {"answer": "Mocked Agent Response"},
+        "exec_result": None,
+    }
 
     # Setup DB
     init_db()
@@ -24,7 +28,7 @@ def test_chat_flow(mock_run_agent):
     response = client.post(
         "/chat",
         data={"message": "Hello Agent"},
-        headers={"x-forwarded-user": "test_api_user"}
+        headers={"x-forwarded-user": "test_api_user"},
     )
 
     assert response.status_code == 200
@@ -57,6 +61,7 @@ def test_chat_flow(mock_run_agent):
     assert response.status_code == 200
     assert len(response.json()) == 0
 
+
 def test_job_scheduling():
     # Ensure user exists first (re-using client state if persistent, but safe to re-init)
     # We need to mock run_agent here too implicitly because /chat calls it
@@ -65,17 +70,18 @@ def test_job_scheduling():
         client.post(
             "/chat",
             data={"message": "Init user"},
-            headers={"x-forwarded-user": "job_user"}
+            headers={"x-forwarded-user": "job_user"},
         )
 
     response = client.post(
         "/jobs",
         json={"query": "Run analysis", "interval_seconds": 3600},
-        headers={"x-forwarded-user": "job_user"}
+        headers={"x-forwarded-user": "job_user"},
     )
 
     assert response.status_code == 200
     assert response.json()["status"] == "Job scheduled"
+
 
 if __name__ == "__main__":
     test_chat_flow()
