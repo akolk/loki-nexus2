@@ -61,7 +61,7 @@ def fetch_collections_metadata(collections_url: str) -> List[Dict[str, Any]]:
                 "id": coll_id,
                 "title": coll_title or coll_id,
                 "description": coll_desc,
-                "keywords": processed_keywords
+                "keywords": processed_keywords,
             }
 
             for link in coll.get("links", []):
@@ -93,7 +93,7 @@ def get_or_create_pdok_source(session) -> MetadataSource:
             name="PDOK",
             base_url="https://api.pdok.nl",
             source_type="pdok",
-            description="Publieke Dienstverlening op de Kaart - Dutch geospatial data API"
+            description="Publieke Dienstverlening op de Kaart - Dutch geospatial data API",
         )
         session.add(source)
         session.commit()
@@ -149,7 +149,7 @@ async def fetch_pdok_metadata() -> str:
                 existing = session.exec(
                     select(MetadataEndpoint).where(
                         MetadataEndpoint.source_id == source.id,
-                        MetadataEndpoint.endpoint_url == api_url
+                        MetadataEndpoint.endpoint_url == api_url,
                     )
                 ).first()
 
@@ -161,7 +161,9 @@ async def fetch_pdok_metadata() -> str:
                     elif isinstance(kw, str):
                         processed_keywords.append(kw)
 
-                keywords_str = ", ".join(processed_keywords) if processed_keywords else ""
+                keywords_str = (
+                    ", ".join(processed_keywords) if processed_keywords else ""
+                )
                 embedding_text = f"{title}: {description}"
                 if keywords_str:
                     embedding_text += f" Keywords: {keywords_str}"
@@ -172,7 +174,7 @@ async def fetch_pdok_metadata() -> str:
                     "tiles_url": api_info.get("tiles_url"),
                     "collections_url": collections_url,
                     "keywords": processed_keywords,
-                    "collections": []
+                    "collections": [],
                 }
 
                 if existing:
@@ -189,7 +191,7 @@ async def fetch_pdok_metadata() -> str:
                         title=title,
                         description=description,
                         api_type="OGC API",
-                        embedding=embedding
+                        embedding=embedding,
                     )
                     endpoint.set_extra_metadata(extra_data)
                     session.add(endpoint)
@@ -199,7 +201,9 @@ async def fetch_pdok_metadata() -> str:
 
                 if collections_url:
                     collections_data = fetch_collections_metadata(collections_url)
-                    logger.info(f"Found {len(collections_data)} collections for {title}")
+                    logger.info(
+                        f"Found {len(collections_data)} collections for {title}"
+                    )
 
                     for coll in collections_data:
                         coll_url = coll.get("features_url", "")
@@ -213,26 +217,32 @@ async def fetch_pdok_metadata() -> str:
                         coll_existing = session.exec(
                             select(MetadataEndpoint).where(
                                 MetadataEndpoint.source_id == source.id,
-                                MetadataEndpoint.endpoint_url == coll_url
+                                MetadataEndpoint.endpoint_url == coll_url,
                             )
                         ).first()
 
                         coll_keywords = coll.get("keywords", [])
-                        coll_keywords_str = ", ".join(coll_keywords) if coll_keywords else ""
+                        coll_keywords_str = (
+                            ", ".join(coll_keywords) if coll_keywords else ""
+                        )
                         coll_embedding_text = f"{coll_title}: {coll_desc}"
                         if coll_keywords_str:
                             coll_embedding_text += f" Keywords: {coll_keywords_str}"
 
                         coll_embedding = await generate_embedding(coll_embedding_text)
 
-                        parent_title = title.replace(" (OGC API)", "").replace("OGC API", "").strip()
+                        parent_title = (
+                            title.replace(" (OGC API)", "")
+                            .replace("OGC API", "")
+                            .strip()
+                        )
                         full_title = f"{parent_title} - {coll_title}"
 
                         coll_extra = {
                             "parent_endpoint": api_url,
                             "collection_id": coll_id,
                             "tiles_url": api_info.get("tiles_url"),
-                            "keywords": coll_keywords
+                            "keywords": coll_keywords,
                         }
 
                         if coll_existing:
@@ -248,7 +258,7 @@ async def fetch_pdok_metadata() -> str:
                                 title=full_title,
                                 description=coll_desc,
                                 api_type="OGC API Collection",
-                                embedding=coll_embedding
+                                embedding=coll_embedding,
                             )
                             coll_endpoint.set_extra_metadata(coll_extra)
                             session.add(coll_endpoint)

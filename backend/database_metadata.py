@@ -17,9 +17,7 @@ METADATA_DATABASE_URL_SYNC = f"postgresql://{LOKI_METADATA_USER}:{LOKI_METADATA_
 
 
 metadata_engine = create_engine(
-    METADATA_DATABASE_URL_SYNC,
-    poolclass=NullPool,
-    echo=False
+    METADATA_DATABASE_URL_SYNC, poolclass=NullPool, echo=False
 )
 
 
@@ -42,6 +40,7 @@ def create_metadata_tables():
         logger.info("Metadata tables created successfully.")
     except Exception as e:
         import traceback
+
         logger.error(f"Error creating metadata tables: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise

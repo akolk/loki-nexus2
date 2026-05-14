@@ -14,8 +14,7 @@ def _get_safe_path(filepath: str) -> Path:
 
     # Check if the resolved path is within the workspace directory
     if not safe_path.is_relative_to(WORKSPACE_DIR.resolve()):
-        raise ValueError(
-            f"Access denied: {filepath} is outside the workspace.")
+        raise ValueError(f"Access denied: {filepath} is outside the workspace.")
 
     return safe_path
 
@@ -27,7 +26,7 @@ def read_file(filepath: str) -> str:
         if not path.exists():
             return f"Error: File {filepath} not found."
 
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             return f.read()
     except ValueError as ve:
         return str(ve)
@@ -39,7 +38,7 @@ def write_file(filepath: str, content: str) -> str:
     """Writes content to a file in the workspace."""
     try:
         path = _get_safe_path(filepath)
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             f.write(content)
         return "File written successfully."
     except ValueError as ve:
