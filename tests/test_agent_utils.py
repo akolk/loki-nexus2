@@ -1,6 +1,7 @@
 import pytest
 from backend.agents.chat import get_result
 
+
 def test_get_result_removes_unallowed_globals():
     allowed_globals = {"pd", "np", "px"}
 
@@ -10,7 +11,7 @@ def test_get_result_removes_unallowed_globals():
         "px": "plotly_mock",
         "unallowed_var": 123,
         "__builtins__": "builtins_mock",
-        "result": "the_final_result"
+        "result": "the_final_result",
     }
 
     res = get_result(exec_globals, allowed_globals)
@@ -32,13 +33,11 @@ def test_get_result_removes_unallowed_globals():
     # Check that unallowed globals are removed
     assert "unallowed_var" not in exec_globals
 
+
 def test_get_result_handles_missing_result_key():
     allowed_globals = {"pd"}
 
-    exec_globals = {
-        "pd": "pandas_mock",
-        "temp_var": 456
-    }
+    exec_globals = {"pd": "pandas_mock", "temp_var": 456}
 
     res = get_result(exec_globals, allowed_globals)
 

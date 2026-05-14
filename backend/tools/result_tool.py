@@ -5,12 +5,14 @@ import pandas as pd
 
 try:
     import polars as pl
+
     POLARS_DF_TYPE = pl.DataFrame
 except ImportError:
     POLARS_DF_TYPE = ()
 
 try:
     import plotly.graph_objects as go
+
     PLOTLY_FIG_TYPE = go.Figure
 except ImportError:
     PLOTLY_FIG_TYPE = ()
@@ -26,10 +28,7 @@ def map_content_to_frontend(content):
             content = content.to_crs("EPSG:4326")
 
         # Convert datetime columns to strings before serialization
-        for col in content.select_dtypes(
-            include=[
-                'datetime64',
-                'datetimetz']).columns:
+        for col in content.select_dtypes(include=["datetime64", "datetimetz"]).columns:
             content[col] = content[col].astype(str)
 
         # Handle NaNs (replace with None so it serializes to json null instead
@@ -39,10 +38,8 @@ def map_content_to_frontend(content):
         geojson_data = json.loads(content.to_json(drop_id=True))
         return {
             "type": "geojson_map",
-            "content": {
-                "features": geojson_data.get(
-                    "features",
-                    [])}}
+            "content": {"features": geojson_data.get("features", [])},
+        }
 
     elif isinstance(content, pd.DataFrame):
         html_table = content.to_html(classes="dataframe-table", index=False)
@@ -50,8 +47,7 @@ def map_content_to_frontend(content):
 
     elif isinstance(content, POLARS_DF_TYPE):
         # Convert Polars to Pandas to reuse to_html
-        html_table = content.to_pandas().to_html(
-            classes="dataframe-table", index=False)
+        html_table = content.to_pandas().to_html(classes="dataframe-table", index=False)
         return {"type": "dataframe", "content": html_table}
 
     elif isinstance(content, PLOTLY_FIG_TYPE):
@@ -65,13 +61,12 @@ def map_content_to_frontend(content):
             "html",
             "plotly",
             "dict",
-                "download"]:
+            "download",
+        ]:
             return content
         return {"type": content.get("type"), "content": content}
     elif isinstance(content, str):
         return {"answer": content}
     else:
-        return {
-            "type": "error",
-            "content": f"Error: unknown datatype {
+        return {"type": "error", "content": f"Error: unknown datatype {
                 type(content)}."}

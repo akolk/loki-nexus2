@@ -4,9 +4,11 @@ import os
 import uvicorn
 from backend.main import app
 
+
 # Function to run the server in a separate thread
 def run_server():
     uvicorn.run(app, host="127.0.0.1", port=8000, log_level="error")
+
 
 if __name__ == "__main__":
     # Start the server thread
@@ -38,7 +40,7 @@ if __name__ == "__main__":
 
             # 3. Send a Chat Message
             print("Sending chat message...")
-            page.click("#chat-bubble") # Open the chat window first
+            page.click("#chat-bubble")  # Open the chat window first
             page.wait_for_selector("#chat-window", state="visible")
             page.fill("#message-input", "Hello Playwright")
             page.click("button:has-text('Send')")
@@ -57,7 +59,9 @@ if __name__ == "__main__":
 
             # 4. Schedule Job
             print("Scheduling job...")
-            page.evaluate("openSettings()") # Settings open on hover which is flaky with playwright click
+            page.evaluate(
+                "openSettings()"
+            )  # Settings open on hover which is flaky with playwright click
             page.wait_for_selector("#settings-sidebar", state="visible")
             page.fill("#job-query", "Test Job")
             page.click("button:has-text('Add Job')")

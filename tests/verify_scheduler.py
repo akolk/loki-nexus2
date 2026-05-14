@@ -1,9 +1,15 @@
 import asyncio
-from backend.scheduler import add_job, start_scheduler, scheduler, scheduled_research_task
+from backend.scheduler import (
+    add_job,
+    start_scheduler,
+    scheduler,
+    scheduled_research_task,
+)
 from backend.database import init_db, engine
 from backend.models import User, ResearchStep, Soul
 from sqlmodel import Session
 import logging
+
 
 # Mock run_agent so we don't actually call OpenAI
 async def mock_run_agent(query, deps):
@@ -14,15 +20,18 @@ async def mock_run_agent(query, deps):
         query=query,
         thought_process="Mock thought",
         output_summary="Mock result",
-        output_metadata={"mock": True}
+        output_metadata={"mock": True},
     )
     deps.db_session.add(step)
     deps.db_session.commit()
     return "Mock result"
 
+
 # Monkey patch
 import backend.scheduler
+
 backend.scheduler.run_agent = mock_run_agent
+
 
 async def verify_scheduler():
     logging.basicConfig(level=logging.INFO)
@@ -45,11 +54,15 @@ async def verify_scheduler():
     add_job(user_id=1, query="Analyze data daily", interval_seconds=1)
 
     print("Waiting for job to run...")
-    await asyncio.sleep(2.5) # Wait for 2 executions approx
+    await asyncio.sleep(2.5)  # Wait for 2 executions approx
 
     # Check if job ran by inspecting DB
     with Session(engine) as session:
-        steps = session.query(ResearchStep).filter(ResearchStep.query == "Analyze data daily").all()
+        steps = (
+            session.query(ResearchStep)
+            .filter(ResearchStep.query == "Analyze data daily")
+            .all()
+        )
         print(f"Research steps found: {len(steps)}")
         if len(steps) >= 1:
             print("Scheduler verified: Job executed and result stored.")
@@ -58,6 +71,7 @@ async def verify_scheduler():
             exit(1)
 
     scheduler.shutdown()
+
 
 if __name__ == "__main__":
     try:
