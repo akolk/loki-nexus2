@@ -64,6 +64,7 @@ def map_content_to_frontend(content):
             "picture",
             "html",
             "plotly",
+            "folium",
             "dict",
                 "download"]:
             return content
