@@ -47,7 +47,7 @@ model_settings = OpenAIResponsesModelSettings(
 level = "medior"
 
 
-def sys_prompt(soul, memory) -> str:
+def sys_prompt(soul: str, memory: str) -> str:
     return dedent(f"""
         You are an expert Python data scientist talking to:
         {soul}.
