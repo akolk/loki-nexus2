@@ -1,6 +1,6 @@
 import json
 import logging
-import requests
+import httpx
 
 import pathlib
 
@@ -15,7 +15,7 @@ ogc_apis = _load_ogc_apis()
 
 
 def fetch_ogc_data(url):
-    response = requests.get(url)
+    response = httpx.get(url)
     response.raise_for_status()
     return response.json()
 
@@ -24,9 +24,9 @@ def fetch_ogc_collections(apiurl, itemType="feature"):
     try:
         url = apiurl.rstrip('/') + "/collections?f=json"
         print(url)
-        response = requests.get(url)
+        response = httpx.get(url)
         response.raise_for_status()
-    except requests.exceptions.RequestException as e:
+    except httpx.HTTPError as e:
         print(e)
         return None
     return response.json()
